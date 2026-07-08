@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: radar-inmobiliario-ags
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    routes:
+      # Redirect (no rewrite) para que la URL quede en /web/ y así los assets
+      # relativos (styles.css, main.js, fetch("../data/...")) resuelvan bien.
+      - type: redirect
+        source: /
+        destination: /web/
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=3600

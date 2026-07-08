@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radar Inmobiliario · Aguascalientes</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">◈</span>
+      <h1>Radar Inmobiliario <span class="brand-sub">· Aguascalientes</span></h1>
+    </div>
+    <div class="search-box">
+      <input id="search-input" type="text"
+             placeholder="Buscar dirección o colonia en Aguascalientes…"
+             autocomplete="off">
+      <button id="search-btn" title="Buscar">🔍</button>
+      <ul id="search-results" class="hidden"></ul>
+    </div>
+    <button id="about-btn" class="about-btn" title="Acerca de este mapa">ⓘ Acerca de</button>
+  </header>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- Panel de zona de estudio (aparece al dibujar un polígono) -->
+    <aside class="zone-panel hidden" id="zone-panel">
+      <div class="zone-head">
+        <h2>📐 Zona de estudio</h2>
+        <button id="zone-close" title="Quitar zona">✕</button>
+      </div>
+      <div id="zone-stats"></div>
+      <div class="zone-chart"><canvas id="chart-nse"></canvas></div>
+      <div class="zone-chart"><canvas id="chart-cat"></canvas></div>
+      <button class="zone-report-btn" id="btn-report">📄 Generar reporte PDF</button>
+      <div class="zone-note">Estadísticas calculadas con datos abiertos (INEGI, Leyes de
+        Ingresos 2026, IMPLAN). No es un avalúo.</div>
+    </aside>
+
+    <!-- Comparador de colonias -->
+    <div class="compare-panel hidden" id="compare-panel">
+      <div class="zone-head">
+        <h2>⚖️ Comparador</h2>
+        <button id="compare-close" title="Cerrar">✕</button>
+      </div>
+      <div id="compare-table"></div>
+    </div>
+
+    <!-- Panel de capas (columna derecha, estilo radar) -->
+    <nav class="layer-panel" aria-label="Capas">
+      <button class="layer-btn active" id="btn-nse" data-layer="nse" title="Nivel Socioeconómico">
+        <span class="layer-icon">👥</span>
+        <span class="layer-label">NSE</span>
+      </button>
+      <button class="layer-btn" id="btn-price" data-layer="price" title="Zonas de precio $/m²">
+        <span class="layer-icon">💰</span>
+        <span class="layer-label">$/m²</span>
+      </button>
+      <button class="layer-btn" id="btn-cat" data-layer="cat" title="Valor catastral oficial ($/m² de suelo)">
+        <span class="layer-icon">🏛️</span>
+        <span class="layer-label">Catastral</span>
+      </button>
+      <button class="layer-btn" id="btn-rec" data-layer="rec" title="Viviendas con 2+ recámaras (Censo 2020)">
+        <span class="layer-icon">🛏️</span>
+        <span class="layer-label">Recámaras</span>
+      </button>
+      <button class="layer-btn" id="btn-sup" data-layer="sup" title="Tamaño de vivienda — proxy censal de superficie construida">
+        <span class="layer-icon">📐</span>
+        <span class="layer-label">Tamaño</span>
+      </button>
+      <button class="layer-btn" id="btn-pdu" data-layer="pdu" title="Plan de Desarrollo Urbano 2040 — zonificación secundaria (IMPLAN)">
+        <span class="layer-icon">🏗️</span>
+        <span class="layer-label">PDU</span>
+      </button>
+      <div class="panel-sep"></div>
+      <button class="layer-btn" id="btn-home" title="Volver a vista inicial">
+        <span class="layer-icon">🏠</span>
+        <span class="layer-label">Inicio</span>
+      </button>
+    </nav>
+
+    <!-- Leyendas flotantes -->
+    <div class="legend" id="legend-nse">
+      <div class="legend-title">Nivel Socioeconómico (estimado)</div>
+      <div class="legend-rows" id="legend-nse-rows"></div>
+      <div class="legend-note">Proxy con datos del Censo 2020 (INEGI). No es la metodología AMAI.</div>
+    </div>
+    <div class="legend hidden" id="legend-price">
+      <div class="legend-title">Precio aproximado $/m² (jul 2026)</div>
+      <div class="legend-rows" id="legend-price-rows"></div>
+      <div class="legend-note">Estimación de mercado por zona. No es valor catastral ni avalúo.</div>
+    </div>
+    <div class="legend hidden" id="legend-rec">
+      <div class="legend-title">Viviendas con 2+ recámaras</div>
+      <div class="legend-rows" id="legend-rec-rows"></div>
+      <div class="legend-note">% de viviendas habitadas con dos o más recámaras por AGEB.
+        Censo 2020 (INEGI).</div>
+    </div>
+    <div class="legend hidden" id="legend-sup">
+      <div class="legend-title">Tamaño de vivienda (proxy)</div>
+      <div class="legend-rows" id="legend-sup-rows"></div>
+      <div class="legend-note">% de viviendas con 3+ cuartos por AGEB (Censo 2020). Proxy de
+        superficie construida — el m² real es dato catastral no público.</div>
+    </div>
+    <div class="legend hidden" id="legend-pdu">
+      <div class="legend-title">Plan de Desarrollo Urbano 2040</div>
+      <div class="legend-rows" id="legend-pdu-rows"></div>
+      <div class="legend-note">Zonificación secundaria oficial (PDUCA 2040 ev.2, IMPLAN
+        Aguascalientes). Solo municipio de Aguascalientes. Consultar IMPLAN para trámites.</div>
+    </div>
+    <div class="legend hidden" id="legend-cat">
+      <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
+      <div class="legend-rows" id="legend-cat-rows"></div>
+      <div class="legend-note">Valores oficiales por colonia (Leyes de Ingresos 2026 de
+        Aguascalientes y Jesús María). Base del impuesto predial; normalmente por debajo del
+        precio de mercado. Zonas grises: sin colonia delimitada o sin cruce con la tabla.</div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    Datos abiertos INEGI (Censo 2020, Marco Geoestadístico) · Zonas de precio: estimaciones de
+    mercado, <strong>no un avalúo oficial</strong> · Proyecto independiente, sin afiliación con
+    Tinsa/RadarMX · Geocoding © OpenStreetMap/Nominatim
+  </footer>
+
+  <!-- Modal Acerca de -->
+  <div class="modal-backdrop hidden" id="about-modal">
+    <div class="modal">
+      <button class="modal-close" id="about-close">✕</button>
+      <h2>Acerca de este mapa</h2>
+      <p><strong>Radar Inmobiliario · Aguascalientes</strong> es un proyecto independiente y
+        experimental construido exclusivamente con datos abiertos. No tiene afiliación alguna
+        con Tinsa, RadarMX ni AMAI.</p>
+      <h3>Nivel Socioeconómico (NSE) estimado</h3>
+      <p>Índice compuesto calculado por AGEB con variables del <em>Censo de Población y Vivienda
+        2020</em> de INEGI: escolaridad promedio, % de viviendas con internet, computadora,
+        automóvil y servicios completos, y ocupantes por cuarto (hacinamiento). Se clasifica en
+        7 niveles (A/B … E) por percentiles. <strong>Es un proxy propio, no el algoritmo oficial
+        de AMAI</strong>, y puede diferir del NSE real de cada zona.</p>
+      <h3>Zonas de precio ($/m²)</h3>
+      <p>Seis zonas aproximadas (Centro, Norte, Oriente, Sur, Sur-Poniente, Poniente) con rangos
+        de precio por m² a partir de fuentes públicas de mercado (SHF, portales inmobiliarios y
+        prensa local, julio 2026). <strong>No son valores catastrales ni avalúos</strong>; los
+        precios reales varían predio a predio y cambian trimestre a trimestre.</p>
+      <h3>Valor catastral de suelo</h3>
+      <p>Valores unitarios de suelo por colonia tomados del <em>Anexo 1 de la Ley de Ingresos del
+        Municipio de Aguascalientes para el Ejercicio Fiscal 2026</em> (Decreto 377, Periódico
+        Oficial del Estado, 26-dic-2025), cruzados con los polígonos de colonias de INEGI
+        (Delimitación de Colonias y otros Asentamientos Humanos). <strong>Estos sí son valores
+        oficiales</strong> — son la base del impuesto predial — pero el valor catastral suele
+        estar por debajo del precio de mercado. El cruce nombre-a-polígono es automático y puede
+        contener errores; verifica el valor en la ley antes de usarlo para un trámite.</p>
+      <h3>Fuentes</h3>
+      <ul>
+        <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
+        <li>INEGI — Censo 2020, resultados por AGEB y manzana urbana (ITER).</li>
+        <li>SHF — Índice de Precios de la Vivienda; medios y portales inmobiliarios (jul 2026).</li>
+        <li>Mapa base © OpenStreetMap contributors · Geocoding: Nominatim.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js" crossorigin=""></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
+  <script src="main.js?v=2"></script>
+  <script src="zona.js?v=2"></script>
+  <script src="reporte.js?v=2"></script>
+</body>
+</html>

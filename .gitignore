@@ -1,0 +1,14 @@
+# Insumos crudos pesados (shapefiles, PDFs, JPGs de planos) — no se versionan.
+# Se regeneran con scripts/build_*.py; ver README.md para las fuentes.
+data/raw/
+
+# Entorno virtual de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Config local del preview (rutas absolutas de esta máquina)
+.claude/
+
+# Sistema
+.DS_Store
