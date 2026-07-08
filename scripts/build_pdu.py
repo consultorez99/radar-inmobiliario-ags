@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Genera data/ags_pdu.geojson: zonificación secundaria del Programa de
-Desarrollo Urbano de la Ciudad de Aguascalientes 2040 (PDUCA 2040, ev. 2),
-publicada por IMPLAN Aguascalientes en su visor ArcGIS Online.
+Genera data/ags_pdu.geojson: zonificación secundaria de los Programas de
+Desarrollo Urbano de Aguascalientes y Jesús María, publicados por IMPLAN
+Aguascalientes en sus visores ArcGIS Online.
 
-Insumo: data/raw/pduca_webmap.json — webmap de ArcGIS Online (item
-66d60c4f75b44365ae55f6656400da93, referenciado por el visor público de
-IMPLAN). Los polígonos vienen embebidos como featureCollection en Web
-Mercator (EPSG:3857).
-
-Se combinan dos planos oficiales:
-  - MP37 "Zonificación secundaria" (toda la ciudad), y
-  - MP36 "Zonificación secundaria para zona urbana a consolidar y densificar",
-    que subdivide el gran polígono central de MP37.
+Insumos (webmaps de ArcGIS Online con los polígonos embebidos como
+featureCollection en Web Mercator EPSG:3857):
+  - data/raw/pduca_webmap.json     — PDUCA 2040 ev.2 (Aguascalientes),
+    item 66d60c4f75b44365ae55f6656400da93. Combina dos planos oficiales:
+    MP37 "Zonificación secundaria" (toda la ciudad) y MP36 "...para zona
+    urbana a consolidar y densificar" (subdivide el polígono central de MP37).
+  - data/raw/pduca_jm_webmap.json  — Programa de Desarrollo Urbano de
+    Jesús María 2015-2035, item 87779e642ad54f1cbceab3fdc1cfc281. Un solo
+    plano de zonificación secundaria (capa "..._ZS").
 
 Uso:  python scripts/build_pdu.py
 """
@@ -26,24 +26,28 @@ from arcgis2geojson import arcgis2geojson
 from shapely.geometry import shape
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-WEBMAP = os.path.join(BASE, "data/raw/pduca_webmap.json")
 OUT = os.path.join(BASE, "data/ags_pdu.geojson")
 
-LAYER_DETAIL = "PDUCA 2040 ev2 : Zonificación secundaria para zona urbana a consolidar y densificar"
-LAYER_GENERAL = "PDUCA 2040 ev2 : Zonificación secundaria"
+AGS_WEBMAP = os.path.join(BASE, "data/raw/pduca_webmap.json")
+AGS_LAYER_DETAIL = "PDUCA 2040 ev2 : Zonificación secundaria para zona urbana a consolidar y densificar"
+AGS_LAYER_GENERAL = "PDUCA 2040 ev2 : Zonificación secundaria"
 # el polígono de MP37 que MP36 subdivide (se excluye para no duplicar)
-GENERAL_SKIP = "ZONA URBANA A CONSOLIDAR Y DENSIFICAR"
+AGS_GENERAL_SKIP = "ZONA URBANA A CONSOLIDAR Y DENSIFICAR"
 
-# Agrupación de las categorías oficiales en grupos para la leyenda.
-# El texto oficial completo se conserva en la propiedad `uso`.
+JM_WEBMAP = os.path.join(BASE, "data/raw/pduca_jm_webmap.json")
+JM_LAYER = "PCP_JM3_Jesús María_2015-2035_ZS"
+
+# Agrupación de las categorías oficiales (de ambos municipios) en grupos
+# para la leyenda. El texto oficial completo se conserva en la propiedad `uso`.
 GRUPOS = [
-    (r"POPULAR|MEDIO|RESIDENCIAL|CONDOMINIO|DENSIDAD|REGULARIZACION|REGULARIZACIÓN", "Habitacional"),
-    (r"MIXTO", "Mixto"),
+    (r"POPULAR|MEDIO|RESIDENCIAL|CONDOMINIO|DENSIDAD|REGULARIZACION|REGULARIZACIÓN|CONSOLIDACION|CONSOLIDACIÓN", "Habitacional"),
+    (r"MIXTO|MICROINDUSTRIAL", "Mixto"),
     (r"COMERCIO|COMERCIAL", "Comercial / Servicios"),
-    (r"INDUSTRIAL", "Industrial"),
-    (r"CONSERVACI|PRESERVACI|ECOL", "Conservación / Ecológico"),
-    (r"CRECIMIENTO", "Crecimiento futuro"),
-    (r"ESPECIAL", "Especial"),
+    (r"AGROPECUARIO|AGRICOLA|AGRÍCOLA", "Agropecuario"),
+    (r"INDUSTRIA", "Industrial"),
+    (r"CONSERVACI|PRESERVACI|ECOL|ECOTURISMO|REGENERACION|REGENERACIÓN", "Conservación / Ecológico"),
+    (r"CRECIMIENTO|EXPANSION|EXPANSIÓN", "Crecimiento futuro"),
+    (r"RIESGO|ESPECIAL", "Especial"),
 ]
 
 
@@ -54,29 +58,56 @@ def grupo(uso):
     return "Otro"
 
 
-def layer_features(webmap, title, field, skip=None):
-    layer = next(l for l in webmap["operationalLayers"] if l["title"] == title)
+def ags_features(webmap):
+    def layer_feats(title, field, skip=None):
+        layer = next(l for l in webmap["operationalLayers"] if l["title"] == title)
+        feats = []
+        for sub in layer["featureCollection"]["layers"]:
+            for f in sub["featureSet"]["features"]:
+                uso = (f["attributes"].get(field) or "").strip()
+                if not uso or (skip and uso.upper().startswith(skip)):
+                    continue
+                geom = shape(arcgis2geojson(f["geometry"]))
+                feats.append({
+                    "municipio": "Aguascalientes",
+                    "programa": "PDUCA 2040 ev.2",
+                    "uso": uso,
+                    "grupo": grupo(uso),
+                    "hectareas": round(f["attributes"].get("HECTÁREAS", 0), 1),
+                    "plano": field,
+                    "geometry": geom,
+                })
+        return feats
+
+    feats = layer_feats(AGS_LAYER_GENERAL, "Z2_MP37", skip=AGS_GENERAL_SKIP)
+    feats += layer_feats(AGS_LAYER_DETAIL, "Z2_MP36")
+    return feats
+
+
+def jm_features(webmap):
+    layer = next(l for l in webmap["operationalLayers"] if l["title"] == JM_LAYER)
     feats = []
     for sub in layer["featureCollection"]["layers"]:
         for f in sub["featureSet"]["features"]:
-            uso = (f["attributes"].get(field) or "").strip()
-            if not uso or (skip and uso.upper().startswith(skip)):
+            uso = (f["attributes"].get("Zoni_Sec") or "").strip()
+            if not uso:
                 continue
             geom = shape(arcgis2geojson(f["geometry"]))
             feats.append({
+                "municipio": "Jesús María",
+                "programa": "PDU Jesús María 2015-2035",
                 "uso": uso,
                 "grupo": grupo(uso),
-                "hectareas": round(f["attributes"].get("HECTÁREAS", 0), 1),
-                "plano": field,
+                "hectareas": round(f["attributes"].get("Ha", 0), 1),
+                "plano": f["attributes"].get("CLAVE", ""),
                 "geometry": geom,
             })
     return feats
 
 
 def main():
-    webmap = json.load(open(WEBMAP))
-    feats = layer_features(webmap, LAYER_GENERAL, "Z2_MP37", skip=GENERAL_SKIP)
-    feats += layer_features(webmap, LAYER_DETAIL, "Z2_MP36")
+    feats = ags_features(json.load(open(AGS_WEBMAP)))
+    feats += jm_features(json.load(open(JM_WEBMAP)))
 
     gdf = gpd.GeoDataFrame(feats, geometry="geometry", crs="EPSG:3857")
     # sanear auto-intersecciones y simplificar (~5 m) para aligerar el archivo
@@ -84,6 +115,8 @@ def main():
     gdf = gdf.to_crs(epsg=4326)
     gdf.to_file(OUT, driver="GeoJSON")
     print(f"Escrito {OUT} ({os.path.getsize(OUT)//1024} KB), {len(gdf)} polígonos")
+    print(gdf.groupby("municipio")["hectareas"].agg(["count", "sum"]).round(0).to_string())
+    print()
     print(gdf.groupby("grupo")["hectareas"].agg(["count", "sum"]).round(0).to_string())
 
 

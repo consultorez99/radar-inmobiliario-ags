@@ -79,6 +79,7 @@ const PDU_COLORS = {
   "Mixto": "#e8871e",
   "Comercial / Servicios": "#d64550",
   "Industrial": "#7d6b91",
+  "Agropecuario": "#8d6e63",
   "Conservación / Ecológico": "#2a9d8f",
   "Crecimiento futuro": "#c3b1e1",
   "Especial": "#457b9d",
@@ -242,15 +243,22 @@ function supPopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Proxy censal del tamaño de vivienda (Censo 2020). No son m² catastrales.</div>`;
 }
 
+function pduPlanoTxt(p) {
+  if (p.plano === "Z2_MP36") return "MP36 (zona a consolidar)";
+  if (p.plano === "Z2_MP37") return "MP37 (zonificación secundaria)";
+  return p.plano || "—";
+}
+
 function pduPopup(p) {
   return `
-    <div class="popup-title">${p.grupo}</div>
+    <div class="popup-title">${p.grupo} · ${p.municipio}</div>
     <table class="popup-table">
       <tr><td>Uso de suelo</td><td><strong>${p.uso}</strong></td></tr>
       <tr><td>Superficie</td><td>${p.hectareas != null ? p.hectareas.toLocaleString("es-MX") + " ha" : "—"}</td></tr>
-      <tr><td>Plano</td><td>${p.plano === "Z2_MP36" ? "MP36 (zona a consolidar)" : "MP37 (zonificación secundaria)"}</td></tr>
+      <tr><td>Clave/plano</td><td>${pduPlanoTxt(p)}</td></tr>
+      <tr><td>Programa</td><td>${p.programa}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">PDUCA 2040 ev.2 (IMPLAN Aguascalientes). Verificar con IMPLAN para trámites.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Programa de Desarrollo Urbano oficial de cada municipio (IMPLAN Aguascalientes / Jesús María). Verificar con el municipio correspondiente para trámites.</div>`;
 }
 
 // ------------------------------------------------------------ carga de datos

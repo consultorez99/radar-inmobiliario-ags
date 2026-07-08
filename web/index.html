@@ -74,7 +74,7 @@
         <span class="layer-icon">📐</span>
         <span class="layer-label">Tamaño</span>
       </button>
-      <button class="layer-btn" id="btn-pdu" data-layer="pdu" title="Plan de Desarrollo Urbano 2040 — zonificación secundaria (IMPLAN)">
+      <button class="layer-btn" id="btn-pdu" data-layer="pdu" title="Planes de Desarrollo Urbano — zonificación secundaria (Aguascalientes y Jesús María)">
         <span class="layer-icon">🏗️</span>
         <span class="layer-label">PDU</span>
       </button>
@@ -109,10 +109,10 @@
         superficie construida — el m² real es dato catastral no público.</div>
     </div>
     <div class="legend hidden" id="legend-pdu">
-      <div class="legend-title">Plan de Desarrollo Urbano 2040</div>
+      <div class="legend-title">Planes de Desarrollo Urbano</div>
       <div class="legend-rows" id="legend-pdu-rows"></div>
-      <div class="legend-note">Zonificación secundaria oficial (PDUCA 2040 ev.2, IMPLAN
-        Aguascalientes). Solo municipio de Aguascalientes. Consultar IMPLAN para trámites.</div>
+      <div class="legend-note">Zonificación secundaria oficial: PDUCA 2040 ev.2 (Aguascalientes) y
+        PDU Jesús María 2015-2035. Consultar el municipio correspondiente para trámites.</div>
     </div>
     <div class="legend hidden" id="legend-cat">
       <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
@@ -157,6 +157,14 @@
         oficiales</strong> — son la base del impuesto predial — pero el valor catastral suele
         estar por debajo del precio de mercado. El cruce nombre-a-polígono es automático y puede
         contener errores; verifica el valor en la ley antes de usarlo para un trámite.</p>
+      <h3>Planes de Desarrollo Urbano (capa "PDU")</h3>
+      <p>Zonificación secundaria oficial de dos programas distintos: el <em>PDUCA 2040 ev.2</em>
+        de Aguascalientes y el <em>Programa de Desarrollo Urbano de Jesús María 2015-2035</em>,
+        ambos extraídos de los visores públicos de IMPLAN en ArcGIS Online. Muestra usos de suelo
+        (habitacional, mixto, comercial, industrial, agropecuario, conservación, crecimiento
+        futuro) agrupados para la leyenda; el texto oficial completo aparece en cada popup.
+        <strong>Son documentos de planeación vigentes</strong>, no garantizan el uso actual real
+        del predio — verifica siempre con el municipio correspondiente antes de un trámite.</p>
       <h3>Vivienda nueva (panel "📊 Vivienda nueva")</h3>
       <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
         producto, tomados de un estudio de mercado de terceros (corte 1T26).
@@ -168,6 +176,8 @@
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
         <li>INEGI — Censo 2020, resultados por AGEB y manzana urbana (ITER).</li>
         <li>SHF — Índice de Precios de la Vivienda; medios y portales inmobiliarios (jul 2026).</li>
+        <li>IMPLAN Aguascalientes — PDUCA 2040 ev.2, visor ArcGIS Online.</li>
+        <li>Programa de Desarrollo Urbano de Jesús María 2015-2035, visor ArcGIS Online.</li>
         <li>Estudio de mercado de terceros — corte 1T26 (fuente privada, adquirida por el despacho).</li>
         <li>Mapa base © OpenStreetMap contributors · Geocoding: Nominatim.</li>
       </ul>
@@ -190,7 +200,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=2"></script>
+  <script src="main.js?v=3"></script>
   <script src="zona.js?v=2"></script>
   <script src="reporte.js?v=2"></script>
   <script src="softec.js?v=1"></script>
