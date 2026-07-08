@@ -41,6 +41,73 @@ const SOFTEC_VERTICAL = [
   { seg: "R", nombre: "Residencial", proyectos: 20, unidades: 737, precioM2Min: 32928, precioM2Prom: 41328, precioM2Max: 54743, absorcion: 0.7, exito: 2.2, mesesInv: 30 },
 ];
 
+// Accesibilidad (financiamiento) por segmento, 1T26 (fuente: p.36).
+// Verificado: en los 8 renglones, ingresosRequeridos = pagoMensual / 0.30
+// (regla de no destinar más del 30% del ingreso a la vivienda).
+const SOFTEC_ACCESIBILIDAD_H = [
+  { seg: "S", nombre: "Social", valor: 815500, enganchePct: 10, financiamientoPct: 90, pagoMensual: 9572, ingresos: 28715 },
+  { seg: "E", nombre: "Económica", valor: 884500, enganchePct: 15, financiamientoPct: 85, pagoMensual: 9835, ingresos: 29504 },
+  { seg: "M", nombre: "Media", valor: 1990108, enganchePct: 20, financiamientoPct: 80, pagoMensual: 20407, ingresos: 61222 },
+  { seg: "R", nombre: "Residencial", valor: 3176036, enganchePct: 25, financiamientoPct: 75, pagoMensual: 30373, ingresos: 91118 },
+  { seg: "RP", nombre: "Residencial Plus", valor: 8766000, enganchePct: 30, financiamientoPct: 70, pagoMensual: 76830, ingresos: 230489 },
+];
+
+const SOFTEC_ACCESIBILIDAD_V = [
+  { seg: "E", nombre: "Económica", valor: 805000, enganchePct: 15, financiamientoPct: 85, pagoMensual: 8951, ingresos: 26852 },
+  { seg: "M", nombre: "Media", valor: 2518169, enganchePct: 20, financiamientoPct: 80, pagoMensual: 25822, ingresos: 77467 },
+  { seg: "R", nombre: "Residencial", valor: 4173522, enganchePct: 25, financiamientoPct: 75, pagoMensual: 39912, ingresos: 119735 },
+];
+
+const REGLA_INGRESO = 0.30; // pago mensual no debe exceder 30% del ingreso
+
+function amortizar(credito, tasaAnualPct, plazoAnios) {
+  const r = tasaAnualPct / 100 / 12;
+  const n = plazoAnios * 12;
+  if (r === 0) return credito / n;
+  return credito * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+}
+
+function calcularAccesibilidad() {
+  const valor = Number(document.getElementById("calc-valor").value) || 0;
+  const enganchePct = Number(document.getElementById("calc-enganche").value) || 0;
+  const tasa = Number(document.getElementById("calc-tasa").value) || 0;
+  const plazo = Number(document.getElementById("calc-plazo").value) || 20;
+  const ref = document.getElementById("calc-ref").value;
+
+  const enganche = valor * enganchePct / 100;
+  const credito = valor - enganche;
+  const pagoMensual = amortizar(credito, tasa, plazo);
+  const ingresoReq = pagoMensual / REGLA_INGRESO;
+
+  document.getElementById("calc-out-credito").textContent = fmtMXN(Math.round(credito));
+  document.getElementById("calc-out-pago").textContent = fmtMXN(Math.round(pagoMensual));
+  document.getElementById("calc-out-ingreso").textContent = fmtMXN(Math.round(ingresoReq));
+
+  const refEl = document.getElementById("calc-out-contexto");
+  if (!ref) { refEl.textContent = ""; return; }
+  const [tipo, seg] = ref.split(":");
+  const tabla = tipo === "H" ? SOFTEC_ACCESIBILIDAD_H : SOFTEC_ACCESIBILIDAD_V;
+  const row = tabla.find((x) => x.seg === seg);
+  if (row) {
+    refEl.innerHTML = `Para contexto — segmento <strong>${row.nombre}</strong>
+      (${tipo === "H" ? "casas" : "deptos"}) en el estudio: valor promedio ${fmtMXN(row.valor)},
+      pago mensual real ${fmtMXN(row.pagoMensual)}, ingreso requerido real ${fmtMXN(row.ingresos)}.`;
+  }
+}
+
+function onSegmentoRef() {
+  const ref = document.getElementById("calc-ref").value;
+  if (!ref) return;
+  const [tipo, seg] = ref.split(":");
+  const tabla = tipo === "H" ? SOFTEC_ACCESIBILIDAD_H : SOFTEC_ACCESIBILIDAD_V;
+  const row = tabla.find((x) => x.seg === seg);
+  if (row) {
+    document.getElementById("calc-valor").value = row.valor;
+    document.getElementById("calc-enganche").value = row.enganchePct;
+  }
+  calcularAccesibilidad();
+}
+
 // Proyectos y unidades vigentes por municipio, 1T26 (horizontal + vertical)
 // Verificado: suma de municipios coincide exacto con los totales de plaza
 // (13,864 unidades horizontal; 1,153 unidades vertical; 45 y 27 proyectos).
@@ -111,10 +178,59 @@ function buildSoftecPanel() {
       </tr>`).join("")}
     </table></div>
 
+    <h3>Calculadora de accesibilidad</h3>
+    <p class="softec-cobertura">Estimación propia con fórmula estándar de amortización (no es la
+      metodología del estudio). Elige un segmento de referencia para precargar valores reales, o
+      edítalos libremente.</p>
+    <div class="calc-grid">
+      <label>Segmento de referencia
+        <select id="calc-ref">
+          <option value="">— libre —</option>
+          <optgroup label="Casas (horizontal)">
+            ${SOFTEC_ACCESIBILIDAD_H.map((r) => `<option value="H:${r.seg}">${r.nombre}</option>`).join("")}
+          </optgroup>
+          <optgroup label="Departamentos (vertical)">
+            ${SOFTEC_ACCESIBILIDAD_V.map((r) => `<option value="V:${r.seg}">${r.nombre}</option>`).join("")}
+          </optgroup>
+        </select>
+      </label>
+      <label>Valor de la vivienda (MXN)
+        <input type="number" id="calc-valor" value="1990108" step="10000">
+      </label>
+      <label>Enganche (%)
+        <input type="number" id="calc-enganche" value="20" step="1" min="0" max="90">
+      </label>
+      <label>Tasa anual (%)
+        <input type="number" id="calc-tasa" value="11.5" step="0.1" min="0">
+      </label>
+      <label>Plazo (años)
+        <select id="calc-plazo">
+          <option>15</option><option selected>20</option><option>25</option><option>30</option>
+        </select>
+      </label>
+    </div>
+    <div class="softec-cards">
+      <div class="softec-card"><span>Crédito necesario</span><strong id="calc-out-credito">—</strong></div>
+      <div class="softec-card"><span>Pago mensual estimado</span><strong id="calc-out-pago">—</strong></div>
+      <div class="softec-card"><span>Ingreso mensual requerido</span><strong id="calc-out-ingreso">—</strong></div>
+    </div>
+    <p class="softec-cobertura" id="calc-out-contexto"></p>
+    <p class="softec-fuente" style="margin-top:0">Ingreso requerido = pago mensual ÷ 30% (regla de no
+      destinar más de un tercio del ingreso a la vivienda; verificada contra los 8 segmentos del
+      estudio, coincide exacto). El crédito, pago y tasa reales del estudio varían por segmento y
+      no siguen una sola combinación tasa/plazo — esta calculadora es una estimación genérica, no
+      la metodología exacta de la fuente.</p>
+
     <p class="softec-fuente">Fuente: ${SOFTEC_FUENTE}. Estudio de mercado adquirido por el despacho —
       cifras agregadas de toda la plaza, no desglosadas por zona geográfica dentro de este reporte.
       "Absorción" = unidades vendidas por proyecto al mes (promedio). "Éxito comercial" = % de unidades
       vendidas del total mensual. Para trámites o decisiones de inversión, consultar el estudio completo.</p>`;
+
+  document.getElementById("calc-ref").addEventListener("change", onSegmentoRef);
+  for (const id of ["calc-valor", "calc-enganche", "calc-tasa", "calc-plazo"]) {
+    document.getElementById(id).addEventListener("input", calcularAccesibilidad);
+  }
+  calcularAccesibilidad();
 }
 
 const softecModal = document.getElementById("softec-modal");

@@ -215,6 +215,28 @@ Softec, Año 37 No. 4392, Febrero 2026 (corte 1T26) — un estudio de mercado
   mercado Horizontal/Vertical" y "Número de proyectos/unidades por
   municipio".
 
+### Calculadora de accesibilidad
+
+Dentro del mismo panel, una calculadora de crédito hipotecario (`web/softec.js`,
+sección `SOFTEC_ACCESIBILIDAD_*` / `amortizar()`). Usa una fórmula estándar de
+amortización con tasa/plazo editables — **no** replica la metodología del
+estudio (verificado: el estudio no usa una sola combinación tasa/plazo, varía
+por segmento). El campo "enganche %" por segmento sí se derivó y verificó
+contra los montos reales de enganche de la página 36. La regla "ingreso
+requerido = pago mensual ÷ 30%" se confirmó exacta en los 8 segmentos de la
+fuente antes de codificarla.
+
+### Proyectos de vivienda nueva (capa "Proyectos")
+
+`web/proyectos.js` — pines de los principales desarrollos mencionados en el
+estudio (p.23, "Principales desarrolladores"), con su absorción/inventario
+real. De 30 proyectos listados en la fuente, solo 9 se geocodificaron con
+confianza razonable vía Nominatim (`scripts/geocode_softec_proyectos.py`);
+el resto se omitió — **no se inventan coordenadas**. Cada pin indica si la
+ubicación es "exacta" (coincidencia de nombre en OSM) o "aproximada" (calle/
+comercio cercano). Es una capa superpuesta (toggle independiente), no
+exclusiva como las demás — se ve encima de cualquier capa activa.
+
 ## Despliegue en Render
 
 El sitio es 100% estático (HTML/JS/CSS + GeoJSON pre-calculado), no necesita

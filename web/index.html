@@ -79,6 +79,10 @@
         <span class="layer-label">PDU</span>
       </button>
       <div class="panel-sep"></div>
+      <button class="layer-btn" id="btn-proyectos" title="Proyectos de vivienda nueva (superpuesto, independiente de la capa activa)">
+        <span class="layer-icon">🏘️</span>
+        <span class="layer-label">Proyectos</span>
+      </button>
       <button class="layer-btn" id="btn-home" title="Volver a vista inicial">
         <span class="layer-icon">🏠</span>
         <span class="layer-label">Inicio</span>
@@ -114,6 +118,16 @@
       <div class="legend-note">Zonificación secundaria oficial: PDUCA 2040 ev.2 (Aguascalientes), PDU
         Jesús María 2015-2035 (ciudad) y su Programa Municipal 2017-2040 (resto del municipio:
         Margaritas, Maravillas, Colonia Nueva, etc.). Consultar el municipio para trámites.</div>
+    </div>
+    <div class="legend hidden" id="legend-proyectos">
+      <div class="legend-title">Proyectos de vivienda nueva</div>
+      <div class="legend-rows">
+        <div class="legend-row"><span class="legend-dot" style="background:#2a9d8f"></span><span>Casas (horizontal)</span></div>
+        <div class="legend-row"><span class="legend-dot" style="background:#5b2d8e"></span><span>Departamentos (vertical)</span></div>
+        <div class="legend-row"><span class="legend-dot legend-dot-dashed"></span><span>Borde punteado = ubicación aproximada</span></div>
+      </div>
+      <div class="legend-note">9 proyectos con datos de absorción reales (estudio de mercado de
+        terceros, 1T26), geocodificados por nombre. Se superpone a cualquier capa activa.</div>
     </div>
     <div class="legend hidden" id="legend-cat">
       <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
@@ -208,6 +222,7 @@
   <script src="main.js?v=3"></script>
   <script src="zona.js?v=2"></script>
   <script src="reporte.js?v=2"></script>
-  <script src="softec.js?v=1"></script>
+  <script src="softec.js?v=2"></script>
+  <script src="proyectos.js?v=1"></script>
 </body>
 </html>
