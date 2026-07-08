@@ -13,9 +13,11 @@ dos capas choropleth:
 4. **Recámaras** — % de viviendas con 2+ recámaras por AGEB (Censo 2020).
 5. **Tamaño de vivienda (proxy)** — % de viviendas con 3+ cuartos por AGEB
    (Censo 2020); proxy de superficie construida, no son m² catastrales.
-6. **Planes de Desarrollo Urbano** — zonificación secundaria oficial de dos
-   programas: PDUCA 2040 ev.2 (Aguascalientes) y PDU Jesús María 2015-2035,
-   ambos extraídos de sus visores ArcGIS Online.
+6. **Planes de Desarrollo Urbano** — zonificación secundaria oficial de tres
+   programas: PDUCA 2040 ev.2 (Aguascalientes), PDU de la ciudad de Jesús
+   María 2015-2035 y el Programa Municipal de Jesús María 2017-2040 (cubre
+   el resto del municipio: Margaritas, Maravillas, Colonia Nueva, etc.),
+   todos extraídos de sus visores ArcGIS Online (SEGUOT/IMPLAN).
 
 Las capas 4–6 replican (con datos abiertos) tres de los cuatro filtros de
 pago de RadarMX; el cuarto, *Absorción de vivienda nueva*, no tiene fuente
@@ -57,7 +59,7 @@ data/
   ags_agebs.geojson          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona y variables censales
   ags_price_zones.geojson    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
   ags_catastral.geojson      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
-  ags_pdu.geojson            # 424 polígonos de zonificación secundaria: 32 PDUCA 2040 (Ags) + 392 PDU Jesús María
+  ags_pdu.geojson            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
 scripts/
   build_nse.py               # regenera agebs + price_zones desde los insumos
@@ -80,7 +82,8 @@ web/
 | Valores catastrales | Ley de Ingresos del Municipio de Aguascalientes 2026, Anexo 1 (Decreto 377, Periódico Oficial 26-dic-2025) | `data/raw/ley_ingresos_ags_2026.pdf` |
 | Polígonos de colonias | INEGI, Delimitación de Colonias y otros Asentamientos Humanos (DCAH, nov-2023) | `data/raw/dcah/conjunto_de_datos/01as.shp` |
 | Zonificación PDU Ags | IMPLAN Aguascalientes, PDUCA 2040 ev.2 — webmap ArcGIS Online del [visor público](https://www.arcgis.com/apps/View/index.html?appid=fdd1339456bb4d3889a11916cedb9831) (item `66d60c4f75b44365ae55f6656400da93`) | `data/raw/pduca_webmap.json` |
-| Zonificación PDU Jesús María | Programa de Desarrollo Urbano de Jesús María 2015-2035 — webmap ArcGIS Online del [visor público](https://www.arcgis.com/apps/View/index.html?appid=38199e163ac24c5d9cef8b65f1a7b406) (item `87779e642ad54f1cbceab3fdc1cfc281`) | `data/raw/pduca_jm_webmap.json` |
+| Zonificación PDU ciudad Jesús María | Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 — webmap ArcGIS Online del [visor público](https://www.arcgis.com/apps/View/index.html?appid=38199e163ac24c5d9cef8b65f1a7b406) (item `87779e642ad54f1cbceab3fdc1cfc281`, dueño `VISORWEBSEGUOT`) | `data/raw/pduca_jm_webmap.json` |
+| Zonificación PDU municipal Jesús María | Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040 (item `d536f0cad8aa441bb8e255338e2ea717`, mismo dueño). Cubre todo el municipio; se recorta contra el plan de la ciudad para no traslapar. | `data/raw/pdu_jm_municipal_webmap.json` |
 | Recámaras / cuartos | Censo 2020 (mismo ITER de arriba): `VPH_2YMASD`, `VPH_3YMASC` | mismo CSV |
 
 URLs de descarga directa usadas:
