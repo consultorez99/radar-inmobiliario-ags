@@ -83,6 +83,10 @@
         <span class="layer-icon">🏘️</span>
         <span class="layer-label">Proyectos</span>
       </button>
+      <button class="layer-btn" id="btn-poi" title="Puntos de interés: escuelas, salud, abasto, bancos, parques, gasolineras (superpuesto)">
+        <span class="layer-icon">📍</span>
+        <span class="layer-label">POI</span>
+      </button>
       <button class="layer-btn" id="btn-home" title="Volver a vista inicial">
         <span class="layer-icon">🏠</span>
         <span class="layer-label">Inicio</span>
@@ -128,6 +132,12 @@
       </div>
       <div class="legend-note">9 proyectos con datos de absorción reales (estudio de mercado de
         terceros, 1T26), geocodificados por nombre. Se superpone a cualquier capa activa.</div>
+    </div>
+    <div class="legend hidden" id="legend-poi">
+      <div class="legend-title">Puntos de interés</div>
+      <div class="legend-rows" id="legend-poi-rows"></div>
+      <div class="legend-note">1,467 puntos de OpenStreetMap (escuelas, salud, abasto, bancos,
+        parques, gasolineras). Desmarca una categoría para ocultarla. Dato abierto (ODbL).</div>
     </div>
     <div class="legend hidden" id="legend-cat">
       <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
@@ -189,6 +199,11 @@
         <strong>Este es un estudio de mercado adquirido, no un dato abierto</strong> — las cifras
         son agregadas de toda la plaza (5 municipios) y no están desglosadas por zona geográfica
         en este reporte, por eso se presentan como panel de consulta y no como capa del mapa.</p>
+      <h3>Puntos de interés (capa "📍 POI")</h3>
+      <p>1,467 puntos de OpenStreetMap: escuelas y universidades, hospitales/clínicas/farmacias,
+        supermercados y centros comerciales, bancos, parques y gasolineras. Dato abierto (licencia
+        ODbL) — a diferencia de las demás capas superpuestas, se puede regenerar libremente sin
+        restricción de fuente. Capa superpuesta con checkboxes por categoría.</p>
       <h3>Fuentes</h3>
       <ul>
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
@@ -197,6 +212,7 @@
         <li>IMPLAN Aguascalientes — PDUCA 2040 ev.2, visor ArcGIS Online.</li>
         <li>SEGUOT — Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 y
           Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040, visores ArcGIS Online.</li>
+        <li>OpenStreetMap contributors — Puntos de interés (ODbL), vía Overpass API.</li>
         <li>Estudio de mercado de terceros — corte 1T26 (fuente privada, adquirida por el despacho).</li>
         <li>Mapa base © OpenStreetMap contributors · Geocoding: Nominatim.</li>
       </ul>
@@ -224,5 +240,6 @@
   <script src="reporte.js?v=2"></script>
   <script src="softec.js?v=2"></script>
   <script src="proyectos.js?v=1"></script>
+  <script src="poi.js?v=1"></script>
 </body>
 </html>

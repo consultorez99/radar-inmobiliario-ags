@@ -20,8 +20,16 @@ dos capas choropleth:
    todos extraídos de sus visores ArcGIS Online (SEGUOT/IMPLAN).
 
 Las capas 4–6 replican (con datos abiertos) tres de los cuatro filtros de
-pago de RadarMX; el cuarto, *Absorción de vivienda nueva*, no tiene fuente
-abierta equivalente (es la encuesta INCOIN propietaria de Tinsa).
+pago de RadarMX; el cuarto, *Absorción de vivienda nueva*, se resuelve con
+un estudio de mercado adquirido aparte (ver panel "Vivienda nueva" abajo).
+
+Además, dos capas superpuestas (no exclusivas, se ven encima de cualquiera
+de las anteriores):
+
+7. **Proyectos de vivienda nueva** — pines de 9 desarrollos con absorción
+   real, geocodificados por nombre.
+8. **Puntos de interés** — 1,467 escuelas, hospitales/farmacias,
+   supermercados, bancos, parques y gasolineras (OpenStreetMap, dato abierto).
 
 Herramientas interactivas:
 
@@ -60,15 +68,20 @@ data/
   ags_price_zones.geojson    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
   ags_catastral.geojson      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
   ags_pdu.geojson            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
+  ags_poi.geojson            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
 scripts/
   build_nse.py               # regenera agebs + price_zones desde los insumos
   build_catastral.py         # extrae el Anexo 1 de la Ley de Ingresos y lo cruza con colonias DCAH
   build_pdu.py               # convierte los webmaps ArcGIS de IMPLAN (Ags + Jesús María) a un solo GeoJSON
+  build_poi.py               # consulta Overpass API y genera la capa de puntos de interés
+  geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
   index.html, styles.css
   main.js                    # mapa, capas, buscador
   zona.js                    # zona de estudio (Leaflet.Draw + Turf) y comparador
+  proyectos.js               # pines de proyectos de vivienda nueva (superpuesta)
+  poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
 ```
 
@@ -85,6 +98,7 @@ web/
 | Zonificación PDU ciudad Jesús María | Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 — webmap ArcGIS Online del [visor público](https://www.arcgis.com/apps/View/index.html?appid=38199e163ac24c5d9cef8b65f1a7b406) (item `87779e642ad54f1cbceab3fdc1cfc281`, dueño `VISORWEBSEGUOT`) | `data/raw/pduca_jm_webmap.json` |
 | Zonificación PDU municipal Jesús María | Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040 (item `d536f0cad8aa441bb8e255338e2ea717`, mismo dueño). Cubre todo el municipio; se recorta contra el plan de la ciudad para no traslapar. | `data/raw/pdu_jm_municipal_webmap.json` |
 | Recámaras / cuartos | Censo 2020 (mismo ITER de arriba): `VPH_2YMASD`, `VPH_3YMASC` | mismo CSV |
+| Puntos de interés | OpenStreetMap contributors, vía [Overpass API](https://overpass-api.de/api/interpreter) (dato abierto ODbL) | generado por `scripts/build_poi.py`, no se guarda insumo crudo |
 
 URLs de descarga directa usadas:
 
