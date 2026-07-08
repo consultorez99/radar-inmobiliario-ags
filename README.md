@@ -189,6 +189,28 @@ Usa la API pública de Nominatim acotada a Aguascalientes (`viewbox` +
 [política de uso](https://operations.osmfoundation.org/policies/nominatim/).
 Para uso intensivo o comercial se debe montar un geocoder propio.
 
+## Panel "Vivienda nueva" (Softec DIME)
+
+`web/softec.js` contiene cifras agregadas (precio $/m², absorción, éxito
+comercial, inventario) transcritas del estudio **DIME Aguascalientes** de
+Softec, Año 37 No. 4392, Febrero 2026 (corte 1T26) — un estudio de mercado
+**adquirido por el despacho**, no un dato abierto.
+
+- Es un panel de consulta (modal), no una capa geográfica del mapa: Softec
+  no desglosa precio/absorción por zona en este reporte, solo por segmento
+  (Social/Económica/Media/Residencial/Residencial Plus), tipo de producto
+  (horizontal/vertical) y municipio. Ponerlo como choropleth implicaría
+  inventar una distribución espacial que el estudio no da.
+- El PDF original vive en `data/raw/softec/` (gitignorado, no se sube ni se
+  despliega) — el aviso de derechos del propio estudio prohíbe reproducir
+  su contenido/imágenes sin autorización. Solo se transcriben cifras
+  agregadas al código, revisadas línea por línea contra el PDF.
+- Al actualizar de trimestre: reemplazar el PDF en `data/raw/softec/` y
+  editar a mano los objetos `SOFTEC_*` en `web/softec.js` con los nuevos
+  valores de las páginas "Resumen de los principales indicadores... del
+  mercado Horizontal/Vertical" y "Número de proyectos/unidades por
+  municipio".
+
 ## Despliegue en Render
 
 El sitio es 100% estático (HTML/JS/CSS + GeoJSON pre-calculado), no necesita

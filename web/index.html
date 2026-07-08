@@ -22,6 +22,7 @@
       <button id="search-btn" title="Buscar">🔍</button>
       <ul id="search-results" class="hidden"></ul>
     </div>
+    <button id="softec-btn" class="about-btn" title="Mercado de vivienda nueva (Softec DIME)">📊 Vivienda nueva</button>
     <button id="about-btn" class="about-btn" title="Acerca de este mapa">ⓘ Acerca de</button>
   </header>
 
@@ -156,13 +157,29 @@
         oficiales</strong> — son la base del impuesto predial — pero el valor catastral suele
         estar por debajo del precio de mercado. El cruce nombre-a-polígono es automático y puede
         contener errores; verifica el valor en la ley antes de usarlo para un trámite.</p>
+      <h3>Vivienda nueva (panel "📊 Vivienda nueva")</h3>
+      <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
+        producto, tomados del estudio <em>DIME Aguascalientes</em> de Softec (corte 1T26).
+        <strong>Este es un estudio de mercado adquirido, no un dato abierto</strong> — las cifras
+        son agregadas de toda la plaza (5 municipios) y no están desglosadas por zona geográfica
+        en este reporte, por eso se presentan como panel de consulta y no como capa del mapa.</p>
       <h3>Fuentes</h3>
       <ul>
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
         <li>INEGI — Censo 2020, resultados por AGEB y manzana urbana (ITER).</li>
         <li>SHF — Índice de Precios de la Vivienda; medios y portales inmobiliarios (jul 2026).</li>
+        <li>Softec — DIME Aguascalientes, Año 37 No. 4392, Febrero 2026 (estudio adquirido).</li>
         <li>Mapa base © OpenStreetMap contributors · Geocoding: Nominatim.</li>
       </ul>
+    </div>
+  </div>
+
+  <!-- Modal Vivienda nueva (Softec DIME) -->
+  <div class="modal-backdrop hidden" id="softec-modal">
+    <div class="modal modal-wide">
+      <button class="modal-close" id="softec-close">✕</button>
+      <h2>📊 Mercado de vivienda nueva — Softec DIME</h2>
+      <div id="softec-content"></div>
     </div>
   </div>
 
@@ -176,5 +193,6 @@
   <script src="main.js?v=2"></script>
   <script src="zona.js?v=2"></script>
   <script src="reporte.js?v=2"></script>
+  <script src="softec.js?v=1"></script>
 </body>
 </html>
