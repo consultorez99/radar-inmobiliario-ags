@@ -87,6 +87,10 @@
         <span class="layer-icon">📍</span>
         <span class="layer-label">POI</span>
       </button>
+      <button class="layer-btn" id="btn-trafico" title="Tráfico vehicular en tiempo real (TomTom, superpuesto)">
+        <span class="layer-icon">🚦</span>
+        <span class="layer-label">Tráfico</span>
+      </button>
       <button class="layer-btn" id="btn-home" title="Volver a vista inicial">
         <span class="layer-icon">🏠</span>
         <span class="layer-label">Inicio</span>
@@ -138,6 +142,17 @@
       <div class="legend-rows" id="legend-poi-rows"></div>
       <div class="legend-note">1,467 puntos de OpenStreetMap (escuelas, salud, abasto, bancos,
         parques, gasolineras). Desmarca una categoría para ocultarla. Dato abierto (ODbL).</div>
+    </div>
+    <div class="legend hidden" id="legend-trafico">
+      <div class="legend-title">Tráfico en tiempo real</div>
+      <div class="legend-rows">
+        <div class="legend-row"><span class="legend-swatch" style="background:#2ecc40"></span><span>Fluido</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#ff851b"></span><span>Lento</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#ff4136"></span><span>Congestionado</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#85144b"></span><span>Detenido</span></div>
+      </div>
+      <div class="legend-note">Velocidad actual vs. flujo libre, © TomTom. Telemetría comercial en
+        vivo — única capa del mapa que no es dato oficial/abierto.</div>
     </div>
     <div class="legend hidden" id="legend-cat">
       <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
@@ -239,7 +254,9 @@
   <script src="zona.js?v=2"></script>
   <script src="reporte.js?v=2"></script>
   <script src="softec.js?v=2"></script>
+  <script src="config.js?v=1"></script>
   <script src="proyectos.js?v=1"></script>
   <script src="poi.js?v=1"></script>
+  <script src="trafico.js?v=1"></script>
 </body>
 </html>

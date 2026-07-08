@@ -30,6 +30,11 @@ de las anteriores):
    real, geocodificados por nombre.
 8. **Puntos de interés** — 1,467 escuelas, hospitales/farmacias,
    supermercados, bancos, parques y gasolineras (OpenStreetMap, dato abierto).
+9. **Tráfico en tiempo real** — flujo vehicular en vivo (TomTom Traffic,
+   raster tiles). Única capa que no es dato oficial/abierto: es telemetría
+   comercial; requiere la API key en `web/config.js` (plan gratuito de
+   TomTom, 50,000 tiles/día; restringir la key por dominio en su portal,
+   porque en una app estática queda visible en el código del sitio).
 
 Herramientas interactivas:
 
