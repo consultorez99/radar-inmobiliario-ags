@@ -16,7 +16,7 @@
 
 "use strict";
 
-const SOFTEC_FUENTE = "Softec, DIME Aguascalientes, Año 37 No. 4392, Febrero 2026 (corte 1T26)";
+const SOFTEC_FUENTE = "Estudio de mercado de terceros, corte 1T26";
 
 const SOFTEC_RESUMEN = {
   periodo: "1T26", anterior: "4T25",
