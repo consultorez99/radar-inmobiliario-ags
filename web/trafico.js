@@ -79,7 +79,7 @@ map.on("popupclose", () => {
 
 function buildTraficoLayer() {
   return L.tileLayer(
-    `https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}&thickness=10`,
+    `https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${TOMTOM_API_KEY}&thickness=6`,
     {
       maxZoom: 19,
       opacity: 0.85,
