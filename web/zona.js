@@ -17,7 +17,7 @@ const drawControl = new L.Control.Draw({
     polygon: {
       allowIntersection: false,
       showArea: true,
-      shapeOptions: { color: "#7a3fa0", weight: 2.5, fillOpacity: 0.06 },
+      shapeOptions: { color: "#2f6690", weight: 2.5, fillOpacity: 0.06 },
     },
     polyline: false, rectangle: false, circle: false,
     marker: false, circlemarker: false,

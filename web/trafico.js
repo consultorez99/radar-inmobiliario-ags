@@ -53,7 +53,7 @@ async function consultarSegmento(e) {
     if (distMin > 250) return;
 
     if (traficoSegmento) map.removeLayer(traficoSegmento);
-    traficoSegmento = L.polyline(coords, { color: "#3a1f6e", weight: 6, opacity: 0.75 }).addTo(map);
+    traficoSegmento = L.polyline(coords, { color: "#1c2a3a", weight: 6, opacity: 0.75 }).addTo(map);
 
     const [nivel, color] = d.roadClosure ? ["Vía cerrada", "#85144b"] : nivelTrafico(d.currentSpeed, d.freeFlowSpeed);
     const demora = d.currentTravelTime - d.freeFlowTravelTime;
@@ -67,7 +67,7 @@ async function consultarSegmento(e) {
           <tr><td>Flujo libre</td><td>${d.freeFlowSpeed} km/h</td></tr>
           <tr><td>Demora en el tramo</td><td>${demora > 0 ? "+" + demora + " s" : "sin demora"}</td></tr>
         </table>
-        <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Tramo más cercano al clic (resaltado en morado). Tráfico en vivo © TomTom.</div>`)
+        <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Tramo más cercano al clic (resaltado). Tráfico en vivo © TomTom.</div>`)
       .openOn(map);
   } catch (err) { /* sin red o sin dato: no estorbar */ }
 }

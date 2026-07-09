@@ -155,7 +155,7 @@ async function generarReportePDF() {
     return doc;
   } finally {
     btn.disabled = false;
-    btn.textContent = "📄 Generar reporte PDF";
+    btn.textContent = "Generar reporte PDF";
   }
 }
 

@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" crossorigin="">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header class="app-header">
@@ -19,11 +22,19 @@
       <input id="search-input" type="text"
              placeholder="Buscar dirección o colonia en Aguascalientes…"
              autocomplete="off">
-      <button id="search-btn" title="Buscar">🔍</button>
+      <button id="search-btn" title="Buscar">
+        <svg class="icon" width="16" height="16" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="17" y1="17" x2="13" y2="13"/></svg>
+      </button>
       <ul id="search-results" class="hidden"></ul>
     </div>
-    <button id="softec-btn" class="about-btn" title="Mercado de vivienda nueva">📊 Vivienda nueva</button>
-    <button id="about-btn" class="about-btn" title="Acerca de este mapa">ⓘ Acerca de</button>
+    <button id="softec-btn" class="about-btn" title="Mercado de vivienda nueva">
+      <svg class="icon" width="15" height="15" viewBox="0 0 20 20"><line x1="4" y1="16" x2="4" y2="10"/><line x1="10" y1="16" x2="10" y2="6"/><line x1="16" y1="16" x2="16" y2="12"/></svg>
+      Vivienda nueva
+    </button>
+    <button id="about-btn" class="about-btn" title="Acerca de este mapa">
+      <svg class="icon" width="15" height="15" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><line x1="10" y1="9" x2="10" y2="14"/><circle cx="10" cy="6.3" r="0.9" fill="currentColor" stroke="none"/></svg>
+      Acerca de
+    </button>
   </header>
 
   <div class="map-wrap">
@@ -32,13 +43,16 @@
     <!-- Panel de zona de estudio (aparece al dibujar un polígono) -->
     <aside class="zone-panel hidden" id="zone-panel">
       <div class="zone-head">
-        <h2>📐 Zona de estudio</h2>
+        <h2>Zona de estudio</h2>
         <button id="zone-close" title="Quitar zona">✕</button>
       </div>
       <div id="zone-stats"></div>
       <div class="zone-chart"><canvas id="chart-nse"></canvas></div>
       <div class="zone-chart"><canvas id="chart-cat"></canvas></div>
-      <button class="zone-report-btn" id="btn-report">📄 Generar reporte PDF</button>
+      <button class="zone-report-btn" id="btn-report">
+        <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><path d="M5.5 2.5h6l3 3v12h-9z"/><path d="M11.5 2.5v3h3"/><line x1="7.3" y1="10.5" x2="12.7" y2="10.5"/><line x1="7.3" y1="13.3" x2="12.7" y2="13.3"/></svg>
+        Generar reporte PDF
+      </button>
       <div class="zone-note">Estadísticas calculadas con datos abiertos (INEGI, Leyes de
         Ingresos 2026, IMPLAN). No es un avalúo.</div>
     </aside>
@@ -46,7 +60,7 @@
     <!-- Comparador de colonias -->
     <div class="compare-panel hidden" id="compare-panel">
       <div class="zone-head">
-        <h2>⚖️ Comparador</h2>
+        <h2>Comparador</h2>
         <button id="compare-close" title="Cerrar">✕</button>
       </div>
       <div id="compare-table"></div>
@@ -55,44 +69,44 @@
     <!-- Panel de capas (columna derecha, estilo radar) -->
     <nav class="layer-panel" aria-label="Capas">
       <button class="layer-btn active" id="btn-nse" data-layer="nse" title="Nivel Socioeconómico">
-        <span class="layer-icon">👥</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><circle cx="7.2" cy="6.5" r="2.6"/><path d="M2.2 16c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="14.5" cy="7.3" r="2.1"/><path d="M12.6 11.2c2.1.2 3.7 1.9 3.9 4.3"/></svg></span>
         <span class="layer-label">NSE</span>
       </button>
       <button class="layer-btn" id="btn-price" data-layer="price" title="Zonas de precio $/m²">
-        <span class="layer-icon">💰</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M10.5 2.8h4.7v4.7L7.4 15.3a1.4 1.4 0 0 1-2 0l-2.7-2.7a1.4 1.4 0 0 1 0-2z"/><circle cx="13.2" cy="5.8" r="0.9" fill="currentColor" stroke="none"/></svg></span>
         <span class="layer-label">$/m²</span>
       </button>
       <button class="layer-btn" id="btn-cat" data-layer="cat" title="Valor catastral oficial ($/m² de suelo)">
-        <span class="layer-icon">🏛️</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><line x1="2.5" y1="17" x2="17.5" y2="17"/><path d="M3.5 17V8.5L10 4l6.5 4.5V17"/><line x1="6.5" y1="17" x2="6.5" y2="10.5"/><line x1="10" y1="17" x2="10" y2="10.5"/><line x1="13.5" y1="17" x2="13.5" y2="10.5"/></svg></span>
         <span class="layer-label">Catastral</span>
       </button>
       <button class="layer-btn" id="btn-rec" data-layer="rec" title="Viviendas con 2+ recámaras (Censo 2020)">
-        <span class="layer-icon">🛏️</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M2.5 16V6.5"/><path d="M17.5 16v-4.5"/><path d="M2.5 11.5h15"/><rect x="3.5" y="7.5" width="4" height="3" rx="1"/><path d="M9 10.5V9a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 17 9v2.5"/></svg></span>
         <span class="layer-label">Recámaras</span>
       </button>
       <button class="layer-btn" id="btn-sup" data-layer="sup" title="Tamaño de vivienda — proxy censal de superficie construida">
-        <span class="layer-icon">📐</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><rect x="2.5" y="7" width="15" height="6" rx="1"/><line x1="6" y1="7" x2="6" y2="9.5"/><line x1="9.5" y1="7" x2="9.5" y2="9.5"/><line x1="13" y1="7" x2="13" y2="9.5"/></svg></span>
         <span class="layer-label">Tamaño</span>
       </button>
       <button class="layer-btn" id="btn-pdu" data-layer="pdu" title="Planes de Desarrollo Urbano — zonificación secundaria (Aguascalientes y Jesús María)">
-        <span class="layer-icon">🏗️</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M2.5 5.5 7 4l6 2 4.5-1.5v10L13 16l-6-2-4.5 1.5z"/><line x1="7" y1="4" x2="7" y2="14"/><line x1="13" y1="6" x2="13" y2="16"/></svg></span>
         <span class="layer-label">PDU</span>
       </button>
       <div class="panel-sep"></div>
       <button class="layer-btn" id="btn-proyectos" title="Proyectos de vivienda nueva (superpuesto, independiente de la capa activa)">
-        <span class="layer-icon">🏘️</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M3 10.5 7 7l4 3.5"/><path d="M4 10v6h6v-6"/><path d="M11.5 12 14.5 9.5 17.5 12"/><path d="M12.3 12v4.5h4.5V12"/></svg></span>
         <span class="layer-label">Proyectos</span>
       </button>
       <button class="layer-btn" id="btn-poi" title="Puntos de interés: escuelas, salud, abasto, bancos, parques, gasolineras (superpuesto)">
-        <span class="layer-icon">📍</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M10 17.5S4 12 4 7.8a6 6 0 0 1 12 0C16 12 10 17.5 10 17.5z"/><circle cx="10" cy="7.7" r="2"/></svg></span>
         <span class="layer-label">POI</span>
       </button>
       <button class="layer-btn" id="btn-trafico" title="Tráfico vehicular en tiempo real (TomTom, superpuesto)">
-        <span class="layer-icon">🚦</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><rect x="7" y="2.5" width="6" height="13" rx="2"/><circle cx="10" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/><line x1="10" y1="15.5" x2="10" y2="17.5"/></svg></span>
         <span class="layer-label">Tráfico</span>
       </button>
       <button class="layer-btn" id="btn-home" title="Volver a vista inicial">
-        <span class="layer-icon">🏠</span>
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M3 10 10 4l7 6"/><path d="M4.5 9v7h11V9"/><line x1="8" y1="16" x2="8" y2="12"/><line x1="12" y1="16" x2="12" y2="12"/></svg></span>
         <span class="layer-label">Inicio</span>
       </button>
     </nav>
@@ -133,7 +147,7 @@
       <div class="legend-title">Proyectos de vivienda nueva</div>
       <div class="legend-rows">
         <div class="legend-row"><span class="legend-dot" style="background:#2a9d8f"></span><span>Casas (horizontal)</span></div>
-        <div class="legend-row"><span class="legend-dot" style="background:#5b2d8e"></span><span>Departamentos (vertical)</span></div>
+        <div class="legend-row"><span class="legend-dot" style="background:#2f6690"></span><span>Departamentos (vertical)</span></div>
         <div class="legend-row"><span class="legend-dot legend-dot-dashed"></span><span>Borde punteado = ubicación aproximada</span></div>
       </div>
       <div class="legend-note">9 proyectos con datos de absorción reales (estudio de mercado de
@@ -162,7 +176,7 @@
       <div class="legend-note">Valores oficiales por colonia (Leyes de Ingresos 2026 de
         Aguascalientes y Jesús María). Base del impuesto predial; normalmente por debajo del
         precio de mercado. Zonas grises: sin colonia delimitada o sin cruce con la tabla.
-        <br><strong>Tip:</strong> clic en una colonia y usa "⚖️ Comparar" en su popup (hasta 4
+        <br><strong>Tip:</strong> clic en una colonia y usa "Comparar" en su popup (hasta 4
         colonias) para abrir el comparador.</div>
     </div>
   </div>
@@ -210,13 +224,13 @@
         crecimiento futuro) agrupados para la leyenda; el texto oficial completo aparece en cada
         popup. <strong>Son documentos de planeación vigentes</strong>, no garantizan el uso actual real
         del predio — verifica siempre con el municipio correspondiente antes de un trámite.</p>
-      <h3>Vivienda nueva (panel "📊 Vivienda nueva")</h3>
+      <h3>Vivienda nueva (panel "Vivienda nueva")</h3>
       <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
         producto, tomados de un estudio de mercado de terceros (corte 1T26).
         <strong>Este es un estudio de mercado adquirido, no un dato abierto</strong> — las cifras
         son agregadas de toda la plaza (5 municipios) y no están desglosadas por zona geográfica
         en este reporte, por eso se presentan como panel de consulta y no como capa del mapa.</p>
-      <h3>Puntos de interés (capa "📍 POI")</h3>
+      <h3>Puntos de interés (capa "POI")</h3>
       <p>1,467 puntos de OpenStreetMap: escuelas y universidades, hospitales/clínicas/farmacias,
         supermercados y centros comerciales, bancos, parques y gasolineras. Dato abierto (licencia
         ODbL) — a diferencia de las demás capas superpuestas, se puede regenerar libremente sin
@@ -240,7 +254,7 @@
   <div class="modal-backdrop hidden" id="softec-modal">
     <div class="modal modal-wide">
       <button class="modal-close" id="softec-close">✕</button>
-      <h2>📊 Mercado de vivienda nueva</h2>
+      <h2>Mercado de vivienda nueva</h2>
       <div id="softec-content"></div>
     </div>
   </div>
@@ -252,13 +266,13 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=3"></script>
-  <script src="zona.js?v=2"></script>
-  <script src="reporte.js?v=2"></script>
+  <script src="main.js?v=4"></script>
+  <script src="zona.js?v=3"></script>
+  <script src="reporte.js?v=3"></script>
   <script src="softec.js?v=2"></script>
   <script src="config.js?v=1"></script>
-  <script src="proyectos.js?v=1"></script>
-  <script src="poi.js?v=1"></script>
-  <script src="trafico.js?v=3"></script>
+  <script src="proyectos.js?v=2"></script>
+  <script src="poi.js?v=2"></script>
+  <script src="trafico.js?v=4"></script>
 </body>
 </html>

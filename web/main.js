@@ -131,7 +131,7 @@ function priceStyle(feature) {
   return {
     fillColor: priceColor(feature.properties.precio_m2_max || 0),
     fillOpacity: 0.55,
-    color: "#3a1f6e",
+    color: "#1c2a3a",
     weight: 1.6,
   };
 }
@@ -165,7 +165,7 @@ function pduStyle(feature) {
   return {
     fillColor: PDU_COLORS[feature.properties.grupo] || PDU_COLORS["Otro"],
     fillOpacity: 0.55,
-    color: "#5c5470",
+    color: "#4a5568",
     weight: 1,
   };
 }
@@ -194,7 +194,7 @@ function nsePopup(p) {
       <tr><td>Viviendas con auto</td><td>${p.pct_auto != null ? p.pct_auto + "%" : "s/d"}</td></tr>
       <tr><td>Ocupantes por cuarto</td><td>${p.PRO_OCUP_C != null ? p.PRO_OCUP_C : "s/d"}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Estimación propia con Censo 2020 (INEGI). No es dato AMAI/Tinsa.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación propia con Censo 2020 (INEGI). No es dato AMAI/Tinsa.</div>`;
 }
 
 function pricePopup(p) {
@@ -205,7 +205,7 @@ function pricePopup(p) {
       <tr><td>Plusvalía</td><td>${p.plusvalia || "—"}</td></tr>
     </table>
     <div style="margin-top:4px;font-size:12px">${p.nota || ""}</div>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Estimación de mercado (jul 2026). No es valor catastral ni avalúo.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación de mercado (jul 2026). No es valor catastral ni avalúo.</div>`;
 }
 
 function catPopup(p) {
@@ -217,8 +217,8 @@ function catPopup(p) {
       <tr><td>Sector / plano</td><td>${p.sector ?? "—"}</td></tr>
       <tr><td>Código postal</td><td>${p.CP || "—"}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Ley de Ingresos 2026 del municipio correspondiente. Valor oficial base del predial; suele ser menor al precio de mercado. Cruce automático — verificar en la ley para trámites.</div>
-    <button class="popup-cmp-btn" onclick="window.addCompare('${p.CVEGEO}')">⚖️ Comparar</button>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Ley de Ingresos 2026 del municipio correspondiente. Valor oficial base del predial; suele ser menor al precio de mercado. Cruce automático — verificar en la ley para trámites.</div>
+    <button class="popup-cmp-btn" onclick="window.addCompare('${p.CVEGEO}')">Comparar</button>`;
 }
 
 function recPopup(p) {
@@ -229,7 +229,7 @@ function recPopup(p) {
       <tr><td>Viviendas con 3+ cuartos</td><td>${p.pct_3cuart != null ? p.pct_3cuart + "%" : "s/d"}</td></tr>
       <tr><td>Población</td><td>${p.POBTOT != null ? p.POBTOT.toLocaleString("es-MX") : "s/d"}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Censo 2020 (INEGI), viviendas particulares habitadas.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Censo 2020 (INEGI), viviendas particulares habitadas.</div>`;
 }
 
 function supPopup(p) {
@@ -240,7 +240,7 @@ function supPopup(p) {
       <tr><td>Viviendas con 2+ recámaras</td><td>${p.pct_2dorm != null ? p.pct_2dorm + "%" : "s/d"}</td></tr>
       <tr><td>Ocupantes por cuarto</td><td>${p.PRO_OCUP_C ?? "s/d"}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Proxy censal del tamaño de vivienda (Censo 2020). No son m² catastrales.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Proxy censal del tamaño de vivienda (Censo 2020). No son m² catastrales.</div>`;
 }
 
 function pduPlanoTxt(p) {
@@ -258,7 +258,7 @@ function pduPopup(p) {
       <tr><td>Clave/plano</td><td>${pduPlanoTxt(p)}</td></tr>
       <tr><td>Programa</td><td>${p.programa}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">Programa de Desarrollo Urbano oficial de cada municipio (IMPLAN Aguascalientes / Jesús María). Verificar con el municipio correspondiente para trámites.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Programa de Desarrollo Urbano oficial de cada municipio (IMPLAN Aguascalientes / Jesús María). Verificar con el municipio correspondiente para trámites.</div>`;
 }
 
 // ------------------------------------------------------------ carga de datos
@@ -280,7 +280,7 @@ async function loadData() {
     style: nseStyle,
     onEachFeature: (f, layer) => {
       layer.bindPopup(nsePopup(f.properties), { maxWidth: 290 });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2.2, color: "#3a1f6e" }));
+      layer.on("mouseover", () => layer.setStyle({ weight: 2.2, color: "#1c2a3a" }));
       layer.on("mouseout", () => nseLayer.resetStyle(layer));
     },
   });

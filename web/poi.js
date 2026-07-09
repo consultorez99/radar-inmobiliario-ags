@@ -9,12 +9,12 @@
 "use strict";
 
 const POI_ESTILO = {
-  "Educación": { color: "#1d4ed8", icon: "🎓" },
-  "Salud": { color: "#dc2626", icon: "🏥" },
-  "Abasto": { color: "#ea580c", icon: "🛒" },
-  "Bancos": { color: "#065f46", icon: "🏦" },
-  "Parques": { color: "#16a34a", icon: "🌳" },
-  "Gasolineras": { color: "#57534e", icon: "⛽" },
+  "Educación": { color: "#1d4ed8" },
+  "Salud": { color: "#dc2626" },
+  "Abasto": { color: "#ea580c" },
+  "Bancos": { color: "#065f46" },
+  "Parques": { color: "#16a34a" },
+  "Gasolineras": { color: "#57534e" },
 };
 
 let poiLayers = {};   // categoria -> L.layerGroup
@@ -24,10 +24,10 @@ function poiIcon(cat) {
   const est = POI_ESTILO[cat];
   return L.divIcon({
     className: "",
-    html: `<div class="poi-pin" style="background:${est.color}">${est.icon}</div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    popupAnchor: [0, -8],
+    html: `<div class="poi-pin" style="background:${est.color}"></div>`,
+    iconSize: [11, 11],
+    iconAnchor: [5, 5],
+    popupAnchor: [0, -6],
   });
 }
 
@@ -37,7 +37,7 @@ function poiPopup(p) {
     <table class="popup-table">
       <tr><td>Categoría</td><td><strong>${p.categoria}</strong></td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">OpenStreetMap contributors (ODbL).</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">OpenStreetMap contributors (ODbL).</div>`;
 }
 
 async function loadPOI() {
@@ -61,7 +61,7 @@ async function loadPOI() {
     <label class="legend-row poi-check">
       <input type="checkbox" data-cat="${cat}" checked>
       <span class="legend-dot" style="background:${est.color}"></span>
-      <span>${est.icon} ${cat}</span>
+      <span>${cat}</span>
     </label>`).join("");
 
   rows.querySelectorAll("input[type=checkbox]").forEach((chk) => {

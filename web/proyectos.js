@@ -21,7 +21,7 @@ const PROYECTOS_SOFTEC = [
   { nombre: "Garza Sada 128", tipo: "vertical", inventario: 2, vendidas: 28, absorcion: 0.7, lat: 21.93111, lon: -102.34036, confianza: "aproximada", geocode: "Av. Eugenio Garza Sada, Pocitos" },
 ];
 
-const PROYECTOS_COLOR = { horizontal: "#2a9d8f", vertical: "#5b2d8e" };
+const PROYECTOS_COLOR = { horizontal: "#2a9d8f", vertical: "#2f6690" };
 
 function proyectoIcon(p) {
   const color = PROYECTOS_COLOR[p.tipo];
@@ -50,7 +50,7 @@ function proyectoPopup(p) {
       <tr><td>Inventario disponible</td><td>${p.inventario}</td></tr>
       <tr><td>Absorción</td><td><strong>${p.absorcion.toFixed(1)} u/mes</strong></td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:#6b5f85">${confTxt} Estudio de mercado de
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">${confTxt} Estudio de mercado de
       terceros, corte 1T26 — cifras del desarrollo, no de una unidad individual.</div>`;
 }
 
