@@ -1,10 +1,11 @@
 /* Pines de proyectos individuales de vivienda nueva, con datos reales de
  * absorción/inventario de un estudio de mercado de terceros (1T26).
  *
- * Geocodificados por nombre vía Nominatim (OpenStreetMap) contra el estudio
- * — de 30 proyectos mencionados en la fuente, solo 9 tuvieron una coincidencia
- * razonablemente específica y verificable; el resto se omite (no se inventan
- * coordenadas). Cada pin indica su nivel de confianza en la ubicación.
+ * De los 30 proyectos mencionados en la fuente: 9 se geocodificaron por
+ * nombre vía Nominatim (OpenStreetMap, confianza "exacta"/"aproximada" según
+ * especificidad del match) y 21 se ubicaron a mano con coordenadas
+ * proporcionadas por el despacho (confianza "exacta"). No se inventan
+ * coordenadas — cada pin indica su nivel de confianza en la ubicación.
  */
 
 "use strict";
@@ -19,6 +20,27 @@ const PROYECTOS_SOFTEC = [
   { nombre: "San Javier 240 Torre I", tipo: "vertical", inventario: 13, vendidas: 19, absorcion: 1.0, lat: 21.81973, lon: -102.27448, confianza: "aproximada", geocode: "Calle San Javier" },
   { nombre: "Torre Mezquite", tipo: "vertical", inventario: 1, vendidas: 11, absorcion: 0.7, lat: 21.93270, lon: -102.30720, confianza: "exacta", geocode: "Mezquite Torre Residencial, Calzada Los Mezquitales" },
   { nombre: "Garza Sada 128", tipo: "vertical", inventario: 2, vendidas: 28, absorcion: 0.7, lat: 21.93111, lon: -102.34036, confianza: "aproximada", geocode: "Av. Eugenio Garza Sada, Pocitos" },
+  { nombre: "Paseos del Sur CD", tipo: "horizontal", inventario: 500, vendidas: 2400, absorcion: 27.8, lat: 21.81089, lon: -102.27125, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Paseos del Sur", tipo: "horizontal", inventario: 861, vendidas: 2039, absorcion: 25.3, lat: 21.81089, lon: -102.27125, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Villas de Montecasino", tipo: "horizontal", inventario: 130, vendidas: 320, absorcion: 12.8, lat: 21.996609, lon: -102.307115, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "La Nueva Estancia", tipo: "horizontal", inventario: 130, vendidas: 370, absorcion: 12.1, lat: 21.938764, lon: -102.323651, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Villas de Montecasino Circuito Benedicto Sur", tipo: "horizontal", inventario: 4, vendidas: 196, absorcion: 7.4, lat: 21.996609, lon: -102.307115, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Vista Serena", tipo: "horizontal", inventario: 18, vendidas: 82, absorcion: 7.3, lat: 21.963402, lon: -102.251408, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Torres Villa Canto", tipo: "vertical", inventario: 5, vendidas: 85, absorcion: 6.7, lat: 21.913481, lon: -102.231610, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Landa Residencial Cotos Alondras Golondrinas", tipo: "horizontal", inventario: 505, vendidas: 68, absorcion: 6.5, lat: 21.985329, lon: -102.335796, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Vista Serena CS", tipo: "horizontal", inventario: 4, vendidas: 96, absorcion: 6.0, lat: 21.963402, lon: -102.251408, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Gran Reserva Los Angeles", tipo: "horizontal", inventario: 500, vendidas: 150, absorcion: 6.0, lat: 21.954447, lon: -102.273774, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Xaramá Residencial", tipo: "horizontal", inventario: 80, vendidas: 320, absorcion: 4.4, lat: 21.875391, lon: -102.325678, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Ferrara Residencial Gaibana", tipo: "horizontal", inventario: 204, vendidas: 141, absorcion: 4.2, lat: 21.972513, lon: -102.300443, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Reserva San Matías Residencial", tipo: "horizontal", inventario: 49, vendidas: 79, absorcion: 4.0, lat: 21.828030, lon: -102.274484, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Diana Tower", tipo: "vertical", inventario: 8, vendidas: 35, absorcion: 2.4, lat: 21.878142, lon: -102.301581, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "VilaNova Residencial Rancho Santa Mónica", tipo: "vertical", inventario: 8, vendidas: 64, absorcion: 2.1, lat: 21.828280, lon: -102.319999, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Montecristo Torre Bosco", tipo: "vertical", inventario: 20, vendidas: 20, absorcion: 0.9, lat: 21.928909, lon: -102.319383, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Torre Elite", tipo: "vertical", inventario: 10, vendidas: 19, absorcion: 0.9, lat: 21.919699, lon: -102.312463, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Aunna", tipo: "vertical", inventario: 42, vendidas: 28, absorcion: 0.8, lat: 21.949677, lon: -102.324754, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "SoHma Urban Living", tipo: "vertical", inventario: 76, vendidas: 8, absorcion: 0.7, lat: 21.935240, lon: -102.341763, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Torre Universidad Residencial", tipo: "vertical", inventario: 11, vendidas: 16, absorcion: 0.7, lat: 21.906132, lon: -102.307270, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
+  { nombre: "Tremezzo Departamentos", tipo: "vertical", inventario: 24, vendidas: 24, absorcion: 0.7, lat: 21.951394, lon: -102.338933, confianza: "exacta", geocode: "Coordenada proporcionada por el despacho" },
 ];
 
 const PROYECTOS_COLOR = { horizontal: "#2a9d8f", vertical: "#2f6690" };
@@ -39,7 +61,9 @@ function proyectoIcon(p) {
 }
 
 function proyectoPopup(p) {
-  const confTxt = p.confianza === "exacta"
+  const confTxt = p.geocode === "Coordenada proporcionada por el despacho"
+    ? "Ubicación exacta (coordenada proporcionada por el despacho)."
+    : p.confianza === "exacta"
     ? "Ubicación exacta (coincidencia de nombre en OpenStreetMap)."
     : "Ubicación aproximada (calle/comercio cercano, no el predio exacto).";
   return `
