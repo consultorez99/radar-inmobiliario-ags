@@ -388,14 +388,16 @@ const LAYERS = {
 };
 
 function setLayer(name) {
-  if (Object.values(LAYERS).some((get) => !get()) || name === activeLayerName) return;
-  activeLayerName = name;
+  if (Object.values(LAYERS).some((get) => !get())) return;
+  const turningOff = name === activeLayerName;
+  activeLayerName = turningOff ? null : name;
 
   for (const key of Object.keys(LAYERS)) {
-    document.getElementById(`btn-${key}`).classList.toggle("active", name === key);
-    document.getElementById(`legend-${key}`).classList.toggle("hidden", name !== key);
+    const isActive = !turningOff && key === name;
+    document.getElementById(`btn-${key}`).classList.toggle("active", isActive);
+    document.getElementById(`legend-${key}`).classList.toggle("hidden", !isActive);
     const layer = LAYERS[key]();
-    if (name === key) layer.addTo(map);
+    if (isActive) layer.addTo(map);
     else map.removeLayer(layer);
   }
 }
