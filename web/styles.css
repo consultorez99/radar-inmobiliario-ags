@@ -184,7 +184,7 @@ body {
 .legend {
   position: absolute;
   bottom: 18px;
-  right: 12px;
+  left: 12px;   /* a la izquierda: a la derecha obstruía el panel de capas en pantallas angostas */
   z-index: 1000;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 10px;
@@ -544,7 +544,7 @@ body {
 .compare-panel {
   position: absolute;
   bottom: 18px;
-  left: 54px;
+  right: 80px;   /* a la derecha (junto al panel de capas); la izquierda ahora es de las leyendas */
   z-index: 1000;
   max-width: 560px;
   background: rgba(255, 255, 255, 0.97);
