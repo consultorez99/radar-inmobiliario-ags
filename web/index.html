@@ -148,13 +148,10 @@
       <div class="legend-rows">
         <div class="legend-row"><span class="legend-dot" style="background:#2a9d8f"></span><span>Casas (horizontal)</span></div>
         <div class="legend-row"><span class="legend-dot" style="background:#2f6690"></span><span>Departamentos (vertical)</span></div>
-        <div class="legend-row"><span class="legend-dot legend-dot-dashed"></span><span>Borde punteado = ubicación aproximada</span></div>
       </div>
-      <div class="legend-note">30 proyectos — los de mayor absorción (estudio de mercado de
-        terceros, 1T26): 9 geocodificados por nombre y 21 ubicados con coordenadas del despacho.
-        El estudio reporta 72 proyectos vigentes en la plaza, pero solo nombra individualmente a
-        estos 30; el resto solo aparece en tablas agregadas, sin nombre propio. Se superpone a
-        cualquier capa activa.</div>
+      <div class="legend-note">Los 72 proyectos vigentes que reporta el estudio de mercado de
+        terceros (1T26), con coordenadas oficiales tomadas de la ficha individual de cada
+        desarrollo en el reporte fuente. Se superpone a cualquier capa activa.</div>
     </div>
     <div class="legend hidden" id="legend-poi">
       <div class="legend-title">Puntos de interés</div>
@@ -234,12 +231,9 @@
         son agregadas de toda la plaza (5 municipios) y no están desglosadas por zona geográfica
         en este reporte, por eso se presentan como panel de consulta y no como capa del mapa.</p>
       <h3>Proyectos de vivienda nueva (capa "Proyectos")</h3>
-      <p>El mismo estudio reporta <strong>72 proyectos vigentes</strong> en la plaza, pero solo
-        nombra individualmente a los <strong>30 de mayor absorción</strong> (top 15 horizontal +
-        top 15 vertical); el resto solo aparece en tablas agregadas, sin nombre propio, por lo que
-        no se pueden ubicar en el mapa. De esos 30: 9 se geocodificaron por nombre en OpenStreetMap
-        y 21 se ubicaron con coordenadas proporcionadas por el despacho. Cada pin indica su nivel
-        de confianza en la ubicación (borde punteado = aproximada).</p>
+      <p>El mismo estudio reporta <strong>72 proyectos vigentes</strong> en la plaza; los 72 están
+        en el mapa con la coordenada oficial de la ficha individual de cada desarrollo (Reporte
+        Especializado de Proyectos, estudio 1T26) — no son geocodificaciones aproximadas.</p>
       <h3>Puntos de interés (capa "POI")</h3>
       <p>1,467 puntos de OpenStreetMap: escuelas y universidades, hospitales/clínicas/farmacias,
         supermercados y centros comerciales, bancos, parques y gasolineras. Dato abierto (licencia
@@ -281,7 +275,7 @@
   <script src="reporte.js?v=3"></script>
   <script src="softec.js?v=2"></script>
   <script src="config.js?v=1"></script>
-  <script src="proyectos.js?v=4"></script>
+  <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=2"></script>
   <script src="trafico.js?v=4"></script>
 </body>
