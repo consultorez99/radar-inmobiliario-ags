@@ -1,11 +1,18 @@
 /* Pines de proyectos individuales de vivienda nueva, con datos reales de
  * absorción/inventario de un estudio de mercado de terceros (1T26).
  *
- * De los 30 proyectos mencionados en la fuente: 9 se geocodificaron por
- * nombre vía Nominatim (OpenStreetMap, confianza "exacta"/"aproximada" según
- * especificidad del match) y 21 se ubicaron a mano con coordenadas
- * proporcionadas por el despacho (confianza "exacta"). No se inventan
- * coordenadas — cada pin indica su nivel de confianza en la ubicación.
+ * El estudio reporta 72 proyectos vigentes en la plaza (45 horizontal + 27
+ * vertical, ver softec.js), pero solo nombra individualmente a los 30 de
+ * mayor absorción (top 15 horizontal + top 15 vertical, gráfica "Principales
+ * desarrolladores", pág. 23 del PDF fuente) — el resto solo aparece en
+ * tablas agregadas por segmento/tamaño/municipio, sin nombre propio en
+ * ningún lugar del documento, así que no se pueden ubicar.
+ *
+ * De esos 30: 9 se geocodificaron por nombre vía Nominatim (OpenStreetMap,
+ * confianza "exacta"/"aproximada" según especificidad del match) y 21 se
+ * ubicaron a mano con coordenadas proporcionadas por el despacho (confianza
+ * "exacta"). No se inventan coordenadas — cada pin indica su nivel de
+ * confianza en la ubicación.
  */
 
 "use strict";
