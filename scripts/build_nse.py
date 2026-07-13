@@ -216,7 +216,7 @@ def main():
     print(gdf["municipio"].value_counts().to_string())
 
     census = compute_nse(load_census())
-    keep = ["CVEGEO", "POBTOT", "GRAPROES", "PRO_OCUP_C",
+    keep = ["CVEGEO", "POBTOT", "TVIVPARHAB", "GRAPROES", "PRO_OCUP_C",
             "pct_inter", "pct_pc", "pct_auto", "pct_serv",
             "pct_2dorm", "pct_3cuart", "nse_score", "nse_nivel"]
     gdf = gdf.merge(census[keep], on="CVEGEO", how="left")
@@ -228,8 +228,9 @@ def main():
 
     zones = build_price_zones(gdf)
 
-    cols = ["CVEGEO", "CVE_AGEB", "municipio", "zona", "POBTOT", "GRAPROES",
-            "PRO_OCUP_C", "pct_inter", "pct_auto", "pct_2dorm", "pct_3cuart",
+    cols = ["CVEGEO", "CVE_AGEB", "municipio", "zona", "POBTOT", "TVIVPARHAB",
+            "GRAPROES", "PRO_OCUP_C", "pct_inter", "pct_pc", "pct_auto",
+            "pct_serv", "pct_2dorm", "pct_3cuart",
             "nse_score", "nse_nivel", "geometry"]
     gdf[cols].to_file(OUT_AGEBS, driver="GeoJSON")
     zones.to_file(OUT_ZONES, driver="GeoJSON")

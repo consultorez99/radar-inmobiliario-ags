@@ -85,10 +85,44 @@ web/
   index.html, styles.css
   main.js                    # mapa, capas, buscador
   zona.js                    # zona de estudio (Leaflet.Draw + Turf) y comparador
+  buffer.js                  # análisis de zona de influencia (buffer por punto + radio)
+  buffer-core.js             # núcleo de cálculo del buffer (funciones puras, probadas en tests/)
   proyectos.js               # pines de proyectos de vivienda nueva (superpuesta)
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
+tests/
+  buffer.test.js             # tests del buffer: ponderación areal, límite municipal, cobertura
 ```
+
+## Análisis de zona de influencia (botón "Radio")
+
+Dado un punto (clic en el mapa o lat/lng manual) y un radio de 1/2/3/5 km
+(default 3), la app dibuja el buffer circular, resalta las AGEBs
+intersectadas y agrega todo lo que cae dentro, integrado al panel "Zona de
+estudio":
+
+- **Demográficos (Censo 2020)** por *interpolación areal*: cada AGEB
+  parcialmente contenida aporta sus variables ponderadas por la fracción de
+  su área dentro del círculo, **asumiendo distribución uniforme** dentro del
+  AGEB. Población, viviendas habitadas, escolaridad (ponderada por
+  población), % internet/computadora/automóvil/servicios completos,
+  ocupantes por cuarto, % 2+ recámaras y % 3+ cuartos (ponderados por
+  viviendas).
+- **Distribución NSE** (% de población por nivel, proxy propio — no AMAI) y
+  **% del área sin AGEB 2020** (fraccionamientos nuevos / rural), con
+  advertencia visible cuando supera 25% porque los agregados subestiman.
+- **Contexto inmobiliario**: colonias catastrales que intersectan
+  (tabla + min/mediana/max $/m²), usos de suelo PDU (% del área por grupo,
+  indicando programa de origen), proyectos de vivienda nueva con distancia
+  al punto y conteo de POIs por categoría.
+- **Salidas**: exportación CSV (una fila por métrica: nombre, valor, unidad,
+  fuente, método) y sección completa en el reporte PDF con las mismas
+  advertencias metodológicas.
+
+Los resultados se cachean por (punto, radio). El cálculo corre 100% en el
+navegador con el mismo turf.js del CDN. Los tests (`npm install && npm test`,
+solo devDependencies) cubren la ponderación areal, un buffer que cruza el
+límite municipal Aguascalientes/Jesús María y el % de cobertura sin AGEB.
 
 ## Fuentes de datos
 

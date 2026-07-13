@@ -45,10 +45,13 @@ function clearZone() {
   drawnItems.clearLayers();
   currentZone = null;
   currentStats = null;
+  window.clearBufferAnalysis?.(false);
   document.getElementById("zone-panel").classList.add("hidden");
 }
 
 function setZone(polygon) {
+  // el panel muestra un análisis a la vez: quitar el buffer si lo hay
+  window.clearBufferAnalysis?.(false);
   currentZone = polygon;
   currentStats = analyzeZone(polygon);
   renderZonePanel(currentStats);
@@ -166,6 +169,7 @@ function renderZonePanel(s) {
 
   // mostrar el panel ANTES de crear los charts: con el panel oculto los
   // canvas miden 0x0 y las imágenes para el PDF salen corruptas
+  document.getElementById("btn-csv").classList.add("hidden");
   document.getElementById("zone-panel").classList.remove("hidden");
   renderZoneCharts(s);
 }

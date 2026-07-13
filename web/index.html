@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <header class="app-header">
@@ -53,6 +53,10 @@
         <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><path d="M5.5 2.5h6l3 3v12h-9z"/><path d="M11.5 2.5v3h3"/><line x1="7.3" y1="10.5" x2="12.7" y2="10.5"/><line x1="7.3" y1="13.3" x2="12.7" y2="13.3"/></svg>
         Generar reporte PDF
       </button>
+      <button class="zone-report-btn zone-csv-btn hidden" id="btn-csv">
+        <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><path d="M10 3v10"/><path d="M6 9.5 10 13.5 14 9.5"/><path d="M4 16.5h12"/></svg>
+        Exportar CSV
+      </button>
       <div class="zone-note">Estadísticas calculadas con datos abiertos (INEGI, Leyes de
         Ingresos 2026, IMPLAN). No es un avalúo.</div>
     </aside>
@@ -93,6 +97,10 @@
         <span class="layer-label">PDU</span>
       </button>
       <div class="panel-sep"></div>
+      <button class="layer-btn" id="btn-buffer" title="Análisis de zona de influencia: elige un punto (clic en el mapa o coordenadas) y un radio de 1 a 5 km">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none"/><line x1="10" y1="10" x2="14.8" y2="5.2"/></svg></span>
+        <span class="layer-label">Radio</span>
+      </button>
       <button class="layer-btn" id="btn-proyectos" title="Proyectos de vivienda nueva (superpuesto, independiente de la capa activa)">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M3 10.5 7 7l4 3.5"/><path d="M4 10v6h6v-6"/><path d="M11.5 12 14.5 9.5 17.5 12"/><path d="M12.3 12v4.5h4.5V12"/></svg></span>
         <span class="layer-label">Proyectos</span>
@@ -271,12 +279,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
   <script src="main.js?v=4"></script>
-  <script src="zona.js?v=3"></script>
-  <script src="reporte.js?v=3"></script>
+  <script src="zona.js?v=4"></script>
+  <script src="reporte.js?v=4"></script>
   <script src="softec.js?v=2"></script>
   <script src="config.js?v=1"></script>
   <script src="proyectos.js?v=5"></script>
-  <script src="poi.js?v=2"></script>
+  <script src="poi.js?v=3"></script>
   <script src="trafico.js?v=4"></script>
+  <script src="buffer-core.js?v=1"></script>
+  <script src="buffer.js?v=1"></script>
 </body>
 </html>

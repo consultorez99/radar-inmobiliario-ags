@@ -44,6 +44,7 @@ async function loadPOI() {
   const resp = await fetch("../data/ags_poi.geojson");
   if (!resp.ok) return;
   const gj = await resp.json();
+  DATA.poi = gj;   // crudo compartido con buffer.js (análisis de zona de influencia)
 
   for (const cat of Object.keys(POI_ESTILO)) poiLayers[cat] = L.layerGroup();
 

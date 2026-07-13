@@ -1,0 +1,12 @@
+{
+  "name": "radar-inmobiliario-ags",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tests del análisis de zona de influencia (buffer). El sitio es estático y no se compila; turf se usa aquí solo para probar en Node la misma geometría que corre en el navegador (misma versión 6.5.0 del CDN).",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@turf/turf": "6.5.0"
+  }
+}

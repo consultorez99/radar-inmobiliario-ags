@@ -566,6 +566,166 @@ body {
   line-height: 1.35;
 }
 
+/* ---------- Análisis de zona de influencia (buffer) ---------- */
+.zone-csv-btn {
+  background: #fff;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  margin-top: 6px;
+}
+
+.zone-csv-btn:hover { background: var(--accent-soft); }
+
+.buffer-form {
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 9px;
+  margin-bottom: 8px;
+}
+
+.bf-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.bf-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.bf-row input {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-dark);
+}
+
+.bf-row button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bf-row button:hover { background: #285a80; }
+
+.bf-radios {
+  display: flex;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.bf-radio {
+  flex: 1;
+  padding: 4px 0;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.bf-radio.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.bf-hint {
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.buffer-warn {
+  background: #fef3e2;
+  border: 1px solid #f5c98a;
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8a4b08;
+  margin-bottom: 8px;
+}
+
+.bf-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 10px;
+}
+
+.bf-nse {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.buffer-table-wrap {
+  max-height: 170px;
+  overflow-y: auto;
+  margin: 4px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.buffer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.buffer-table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  text-align: left;
+  padding: 4px 7px;
+  font-size: 10px;
+  color: var(--ink);
+}
+
+.buffer-table td {
+  padding: 3px 7px;
+  border-bottom: 1px solid #eee;
+}
+
+.bf-more {
+  padding: 4px 7px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.bf-pdu-row { margin-top: 2px; }
+
+.bf-pdu-prog {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.bf-proy-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
 /* ---------- Comparador ---------- */
 .compare-panel {
   position: absolute;

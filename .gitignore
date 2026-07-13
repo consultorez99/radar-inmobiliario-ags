@@ -12,3 +12,6 @@ __pycache__/
 
 # Sistema
 .DS_Store
+
+# Dependencias de los tests (npm)
+node_modules/
