@@ -55,15 +55,6 @@ const CAT_BINS = [
   { min: 0, color: "#c6dbef", label: "< $2,000 /m²" },
 ];
 
-// Recámaras: % de viviendas con 2+ recámaras (verdes)
-const REC_BINS = [
-  { min: 90, color: "#006d2c", label: "≥ 90%" },
-  { min: 80, color: "#2ca25f", label: "80% – 90%" },
-  { min: 70, color: "#66c2a4", label: "70% – 80%" },
-  { min: 60, color: "#99d8c9", label: "60% – 70%" },
-  { min: 0, color: "#ccece6", label: "< 60%" },
-];
-
 // Tamaño de vivienda: % con 3+ cuartos (naranjas)
 const SUP_BINS = [
   { min: 95, color: "#d94801", label: "≥ 95%" },
@@ -104,7 +95,6 @@ const DATA = { agebs: null, zones: null, cat: null, pdu: null };
 let nseLayer = null;
 let priceLayer = null;
 let catLayer = null;
-let recLayer = null;
 let supLayer = null;
 let pduLayer = null;
 let activeLayerName = "nse";
@@ -221,17 +211,6 @@ function catPopup(p) {
     <button class="popup-cmp-btn" onclick="window.addCompare('${p.CVEGEO}')">Comparar</button>`;
 }
 
-function recPopup(p) {
-  return `
-    <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
-    <table class="popup-table">
-      <tr><td>Viviendas con 2+ recámaras</td><td><strong>${p.pct_2dorm != null ? p.pct_2dorm + "%" : "s/d"}</strong></td></tr>
-      <tr><td>Viviendas con 3+ cuartos</td><td>${p.pct_3cuart != null ? p.pct_3cuart + "%" : "s/d"}</td></tr>
-      <tr><td>Población</td><td>${p.POBTOT != null ? p.POBTOT.toLocaleString("es-MX") : "s/d"}</td></tr>
-    </table>
-    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Censo 2020 (INEGI), viviendas particulares habitadas.</div>`;
-}
-
 function supPopup(p) {
   return `
     <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
@@ -317,16 +296,6 @@ async function loadData() {
     },
   });
 
-  recLayer = L.geoJSON(agebs, {
-    style: pctStyle(REC_BINS, "pct_2dorm"),
-    onEachFeature: (f, layer) => {
-      layer.bindPopup(recPopup(f.properties), { maxWidth: 290 });
-      layer.on("click",     layerClick);
-      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#004d1f" }); });
-      layer.on("mouseout",  () => recLayer.resetStyle(layer));
-    },
-  });
-
   supLayer = L.geoJSON(agebs, {
     style: pctStyle(SUP_BINS, "pct_3cuart"),
     onEachFeature: (f, layer) => {
@@ -386,7 +355,6 @@ function buildLegends() {
         <span class="legend-swatch" style="background:${b.color}"></span>
         <span>${b.label}</span>
       </div>`;
-  document.getElementById("legend-rec-rows").innerHTML = REC_BINS.map(binRow).join("");
   document.getElementById("legend-sup-rows").innerHTML = SUP_BINS.map(binRow).join("");
   document.getElementById("legend-pdu-rows").innerHTML = Object.entries(PDU_COLORS)
     .filter(([g]) => g !== "Otro")
@@ -399,7 +367,6 @@ const LAYERS = {
   nse: () => nseLayer,
   price: () => priceLayer,
   cat: () => catLayer,
-  rec: () => recLayer,
   sup: () => supLayer,
   pdu: () => pduLayer,
 };
@@ -419,7 +386,7 @@ function setLayer(name) {
   }
 }
 
-for (const key of ["nse", "price", "cat", "rec", "sup", "pdu"]) {
+for (const key of ["nse", "price", "cat", "sup", "pdu"]) {
   document.getElementById(`btn-${key}`).addEventListener("click", () => setLayer(key));
 }
 document.getElementById("btn-home").addEventListener("click", () => {
