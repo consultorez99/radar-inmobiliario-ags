@@ -680,28 +680,78 @@ body.buffer-picking #map * {
 
 .bf-row button:hover { background: #285a80; }
 
-.bf-radios {
-  display: flex;
-  gap: 4px;
-  margin-top: 7px;
+.bf-slider-wrap {
+  margin-top: 10px;
 }
 
-.bf-radio {
-  flex: 1;
-  padding: 4px 0;
-  border: 1.5px solid var(--border);
-  border-radius: 6px;
-  background: #fff;
+.bf-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.bf-slider-label {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--ink);
+}
+
+.bf-slider-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 44px;
+  text-align: right;
+}
+
+.bf-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) calc((var(--val, 3) - 0.5) / 9.5 * 100%),
+    var(--border) calc((var(--val, 3) - 0.5) / 9.5 * 100%),
+    var(--border) 100%
+  );
+  outline: none;
   cursor: pointer;
 }
 
-.bf-radio.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+.bf-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+  transition: transform 0.1s;
+}
+.bf-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); }
+
+.bf-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+}
+
+.bf-slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 0 1px;
 }
 
 .bf-hint {

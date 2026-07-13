@@ -19,7 +19,7 @@
 
 "use strict";
 
-const BUFFER_RADII = [1, 2, 3, 5];
+const BUFFER_RADII = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 let bufferRadius = 3;          // radio seleccionado (km)
 let bufferStats = null;        // análisis activo (null = sin buffer)
 let bufferPicking = false;     // esperando clic en el mapa
@@ -250,8 +250,7 @@ const bfPct = (n, d = 1) => (n == null ? "s/d" : n.toFixed(d) + "%");
 function bufferFormHTML(s) {
   const lat = s ? s.lat.toFixed(6) : "";
   const lng = s ? s.lng.toFixed(6) : "";
-  const radios = BUFFER_RADII.map((r) => `
-    <button class="bf-radio ${r === bufferRadius ? "active" : ""}" data-r="${r}">${r} km</button>`).join("");
+  const r = bufferRadius;
   return `
     <div class="buffer-form">
       <div class="bf-row">
@@ -259,7 +258,17 @@ function bufferFormHTML(s) {
         <label>Lng <input id="buf-lng" type="number" step="any" placeholder="-102.2963" value="${lng}"></label>
         <button id="buf-go" title="Analizar estas coordenadas">Analizar</button>
       </div>
-      <div class="bf-radios">${radios}</div>
+      <div class="bf-slider-wrap">
+        <div class="bf-slider-header">
+          <span class="bf-slider-label">Radio</span>
+          <span class="bf-slider-value" id="buf-radius-val">${r} km</span>
+        </div>
+        <input class="bf-slider" id="buf-radius" type="range"
+               min="0.5" max="10" step="0.5" value="${r}">
+        <div class="bf-slider-ticks">
+          <span>0.5</span><span>2.5</span><span>5</span><span>7.5</span><span>10 km</span>
+        </div>
+      </div>
       ${s ? "" : `<div class="bf-hint">Haz clic en el mapa para colocar el punto, o escribe las coordenadas.</div>`}
     </div>`;
 }
@@ -370,15 +379,25 @@ function renderBufferPanel(s) {
       if (e.key === "Enter") go();
     });
   }
-  el.querySelectorAll(".bf-radio").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      bufferRadius = Number(btn.dataset.r);
-      el.querySelectorAll(".bf-radio").forEach((b) =>
-        b.classList.toggle("active", Number(b.dataset.r) === bufferRadius));
-      if (bufferStats) {
-        runBufferAnalysis(bufferStats.lat, bufferStats.lng, bufferRadius, { fit: true });
-      }
-    });
+  // Slider de radio
+  const slider = el.querySelector('#buf-radius');
+  const valLabel = el.querySelector('#buf-radius-val');
+
+  function updateSliderFill(s) {
+    s.style.setProperty('--val', s.value);
+  }
+  updateSliderFill(slider); // inicializar color del track
+
+  slider.addEventListener('input', () => {
+    bufferRadius = Number(slider.value);
+    valLabel.textContent = bufferRadius % 1 === 0 ? bufferRadius + ' km' : bufferRadius.toFixed(1) + ' km';
+    updateSliderFill(slider);
+  });
+  slider.addEventListener('change', () => {
+    bufferRadius = Number(slider.value);
+    if (bufferStats) {
+      runBufferAnalysis(bufferStats.lat, bufferStats.lng, bufferRadius, { fit: true });
+    }
   });
 
   renderBufferCharts(s);
