@@ -69,7 +69,8 @@ python3 -m http.server 8000
 
 ```
 data/
-  ags_agebs.geojson          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona y variables censales
+  ags_agebs.geojson          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona,
+                             # variables censales, pct_deshabitadas, densidad_hab_km2 y crec_mun_2010_2020
   ags_price_zones.geojson    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
   ags_catastral.geojson      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
   ags_pdu.geojson            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
@@ -201,6 +202,32 @@ INEGI (`*`, `N/D`) se imputan al punto medio (0.5) de la variable normalizada.
 **Limitaciones:** es un proxy propio, no la regla AMAI (que usa variables del
 hogar, no agregados por AGEB); los cortes por percentil fuerzan una
 distribución relativa *dentro del municipio*; los datos censales son de 2020.
+
+## Densidad, viviendas deshabitadas y crecimiento poblacional
+
+Tres campos adicionales por AGEB en `ags_agebs.geojson`, calculados en
+`build_nse.py` a partir del mismo Censo 2020 (y, para crecimiento, el
+Censo 2010) ya usado para el NSE:
+
+- **`densidad_hab_km2`** — `POBTOT` entre el área del polígono AGEB
+  (proyectada a EPSG:6372 para medir en metros). Capa "Densidad".
+  Correlaciona moderadamente con el NSE (-0.38) pero no es redundante.
+- **`pct_deshabitadas`** — `VIVPAR_DES / TVIVPAR × 100`. Capa "Vacantes".
+  Correlaciona ~0 con NSE y con el proxy de tamaño de vivienda — señal
+  independiente, útil como indicador de posible sobreoferta (vivienda nueva
+  sin vender) o abandono; el censo no distingue el motivo.
+- **`crec_mun_2010_2020`** — variación % de población TOTAL del municipio
+  (no solo AGEB urbana) entre el Censo 2010 y el Censo 2020. Es un dato de
+  **contexto a nivel municipio** (solo 2 valores posibles: Aguascalientes o
+  Jesús María), no varía por zona — por eso no tiene capa propia en el mapa;
+  se muestra como línea de contexto en los paneles de Zona de estudio y
+  Zona de influencia, y en sus reportes PDF/CSV.
+
+  **Ojo con la fuente de la población 2020 para este cálculo**: no debe
+  sumarse `POBTOT` de las AGEBs urbanas (excluye localidades rurales), sino
+  leerse directo la fila `NOM_LOC == "Total del municipio"` del mismo
+  `ITER_CSV` — de lo contrario Jesús María, con población rural real fuera
+  de la mancha urbana, sale con una caída poblacional falsa.
 
 ## Zonas de precio ($/m²)
 

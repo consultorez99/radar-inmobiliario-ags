@@ -92,6 +92,27 @@
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M2.5 5.5 7 4l6 2 4.5-1.5v10L13 16l-6-2-4.5 1.5z"/><line x1="7" y1="4" x2="7" y2="14"/><line x1="13" y1="6" x2="13" y2="16"/></svg></span>
         <span class="layer-label">PDU</span>
       </button>
+      <button class="layer-btn" id="btn-dens" data-layer="dens" title="Densidad de población (hab/km²) por AGEB — Censo 2020">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20">
+          <circle cx="4.5" cy="15" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="7.5" cy="15" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="11.5" cy="14" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="14" cy="12.5" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="9.5" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="14.5" cy="8" r="1" fill="currentColor" stroke="none"/>
+          <circle cx="12.5" cy="5.5" r="1" fill="currentColor" stroke="none"/>
+        </svg></span>
+        <span class="layer-label">Densidad</span>
+      </button>
+      <button class="layer-btn" id="btn-desh" data-layer="desh" title="% de viviendas particulares deshabitadas por AGEB — Censo 2020">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20">
+          <path d="M3 10 10 4l7 6"/>
+          <path d="M4.5 9v7h11V9"/>
+          <rect x="7.5" y="10.8" width="5" height="5" stroke-dasharray="1.4 1.4"/>
+        </svg></span>
+        <span class="layer-label">Vacantes</span>
+      </button>
       <div class="panel-sep"></div>
       <button class="layer-btn" id="btn-buffer" title="Análisis de zona de influencia: elige un punto (clic en el mapa o coordenadas) y un radio de 1 a 5 km">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none"/><line x1="10" y1="10" x2="14.8" y2="5.2"/></svg></span>
@@ -159,6 +180,30 @@
         <div class="legend-note">Zonificación secundaria oficial: PDUCA 2040 ev.2 (Aguascalientes), PDU
           Jesús María 2015-2035 (ciudad) y su Programa Municipal 2017-2040 (resto del municipio:
           Margaritas, Maravillas, Colonia Nueva, etc.). Consultar el municipio para trámites.</div>
+      </div>
+    </div>
+    <div class="legend hidden" id="legend-dens">
+      <div class="legend-title legend-drag-handle">
+        Densidad de población
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-dens-rows"></div>
+        <div class="legend-note">Habitantes entre área del polígono AGEB (Censo 2020, INEGI). Más
+          densidad no es lo mismo que más NSE ni más tamaño de vivienda — correlación moderada,
+          no la misma capa.</div>
+      </div>
+    </div>
+    <div class="legend hidden" id="legend-desh">
+      <div class="legend-title legend-drag-handle">
+        Viviendas deshabitadas
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-desh-rows"></div>
+        <div class="legend-note">% de viviendas particulares deshabitadas por AGEB (Censo 2020,
+          INEGI). El censo no distingue el motivo: puede ser vivienda nueva aún sin vender/ocupar
+          o vivienda abandonada.</div>
       </div>
     </div>
     <div class="legend hidden" id="legend-proyectos">
@@ -262,6 +307,16 @@
         crecimiento futuro) agrupados para la leyenda; el texto oficial completo aparece en cada
         popup. <strong>Son documentos de planeación vigentes</strong>, no garantizan el uso actual real
         del predio — verifica siempre con el municipio correspondiente antes de un trámite.</p>
+      <h3>Densidad de población (capa "Densidad")</h3>
+      <p>Habitantes entre área del polígono AGEB, calculada proyectando la geometría a una
+        superficie plana en metros (Censo 2020, INEGI). Correlaciona de forma moderada con el NSE
+        (zonas de mayor densidad tienden a NSE más bajo) pero mide algo distinto: forma urbana, no
+        nivel socioeconómico.</p>
+      <h3>Viviendas deshabitadas (capa "Vacantes")</h3>
+      <p>% de viviendas particulares deshabitadas por AGEB (Censo 2020, INEGI). El censo no
+        distingue el motivo de la vacancia: puede ser vivienda nueva aún sin vender u ocupar, o
+        vivienda abandonada — útil como señal de posible sobreoferta o zona en declive, pero
+        requiere verificación en campo antes de interpretarse como una u otra.</p>
       <h3>Vivienda nueva (panel "Vivienda nueva")</h3>
       <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
         producto, tomados de un estudio de mercado de terceros (corte 1T26).
@@ -308,16 +363,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=4"></script>
-  <script src="zona.js?v=4"></script>
-  <script src="reporte.js?v=4"></script>
+  <script src="main.js?v=5"></script>
+  <script src="zona.js?v=5"></script>
+  <script src="reporte.js?v=5"></script>
   <script src="softec.js?v=2"></script>
   <script src="config.js?v=1"></script>
   <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=3"></script>
   <script src="trafico.js?v=4"></script>
   <script src="buffer-core.js?v=1"></script>
-  <script src="buffer.js?v=1"></script>
+  <script src="buffer.js?v=2"></script>
 
   <script>
     /* ---- Minimizar / Expandir leyenda ---- */

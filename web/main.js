@@ -64,6 +64,24 @@ const SUP_BINS = [
   { min: 0, color: "#fee6ce", label: "< 70%" },
 ];
 
+// Densidad de población: hab/km² por AGEB (magentas)
+const DENS_BINS = [
+  { min: 20000, color: "#7a0177", label: "≥ 20,000 hab/km²" },
+  { min: 15000, color: "#ae017e", label: "15,000 – 20,000 hab/km²" },
+  { min: 10000, color: "#dd3497", label: "10,000 – 15,000 hab/km²" },
+  { min: 5000, color: "#f768a1", label: "5,000 – 10,000 hab/km²" },
+  { min: 0, color: "#fcc5c0", label: "< 5,000 hab/km²" },
+];
+
+// Viviendas deshabitadas: % por AGEB (rojos — señal de alerta/sobreoferta)
+const DESH_BINS = [
+  { min: 20, color: "#99000d", label: "≥ 20%" },
+  { min: 15, color: "#cb181d", label: "15% – 20%" },
+  { min: 10, color: "#fb6a4a", label: "10% – 15%" },
+  { min: 5, color: "#fcae91", label: "5% – 10%" },
+  { min: 0, color: "#fee5d9", label: "< 5%" },
+];
+
 // PDU: color por grupo de zonificación
 const PDU_COLORS = {
   "Habitacional": "#f2c14e",
@@ -97,6 +115,8 @@ let priceLayer = null;
 let catLayer = null;
 let supLayer = null;
 let pduLayer = null;
+let densLayer = null;
+let deshLayer = null;
 let activeLayerName = "nse";
 
 // ------------------------------------------------------------------- estilos
@@ -222,6 +242,26 @@ function supPopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Proxy censal del tamaño de vivienda (Censo 2020). No son m² catastrales.</div>`;
 }
 
+function densPopup(p) {
+  return `
+    <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
+    <table class="popup-table">
+      <tr><td>Densidad de población</td><td><strong>${p.densidad_hab_km2 != null ? Math.round(p.densidad_hab_km2).toLocaleString("es-MX") + " hab/km²" : "s/d"}</strong></td></tr>
+      <tr><td>Población</td><td>${p.POBTOT != null ? p.POBTOT.toLocaleString("es-MX") : "s/d"}</td></tr>
+    </table>
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Población entre área del polígono AGEB (Censo 2020, INEGI).</div>`;
+}
+
+function deshPopup(p) {
+  return `
+    <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
+    <table class="popup-table">
+      <tr><td>Viviendas deshabitadas</td><td><strong>${p.pct_deshabitadas != null ? p.pct_deshabitadas + "%" : "s/d"}</strong></td></tr>
+      <tr><td>Población</td><td>${p.POBTOT != null ? p.POBTOT.toLocaleString("es-MX") : "s/d"}</td></tr>
+    </table>
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Censo 2020 (INEGI). Incluye tanto vivienda nueva sin vender/ocupar como vivienda abandonada — el censo no distingue el motivo.</div>`;
+}
+
 function pduPlanoTxt(p) {
   if (p.plano === "Z2_MP36") return "MP36 (zona a consolidar)";
   if (p.plano === "Z2_MP37") return "MP37 (zonificación secundaria)";
@@ -316,6 +356,26 @@ async function loadData() {
     },
   });
 
+  densLayer = L.geoJSON(agebs, {
+    style: pctStyle(DENS_BINS, "densidad_hab_km2"),
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(densPopup(f.properties), { maxWidth: 290 });
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#49006a" }); });
+      layer.on("mouseout",  () => densLayer.resetStyle(layer));
+    },
+  });
+
+  deshLayer = L.geoJSON(agebs, {
+    style: pctStyle(DESH_BINS, "pct_deshabitadas"),
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(deshPopup(f.properties), { maxWidth: 290 });
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#67000d" }); });
+      layer.on("mouseout",  () => deshLayer.resetStyle(layer));
+    },
+  });
+
   nseLayer.addTo(map);
   map.fitBounds(nseLayer.getBounds(), { padding: [20, 20] });
   buildLegends();
@@ -360,6 +420,8 @@ function buildLegends() {
     .filter(([g]) => g !== "Otro")
     .map(([g, color]) => binRow({ color, label: g }))
     .join("");
+  document.getElementById("legend-dens-rows").innerHTML = DENS_BINS.map(binRow).join("");
+  document.getElementById("legend-desh-rows").innerHTML = DESH_BINS.map(binRow).join("");
 }
 
 // ------------------------------------------------------------ cambio de capa
@@ -369,6 +431,8 @@ const LAYERS = {
   cat: () => catLayer,
   sup: () => supLayer,
   pdu: () => pduLayer,
+  dens: () => densLayer,
+  desh: () => deshLayer,
 };
 
 function setLayer(name) {
@@ -386,7 +450,7 @@ function setLayer(name) {
   }
 }
 
-for (const key of ["nse", "price", "cat", "sup", "pdu"]) {
+for (const key of ["nse", "price", "cat", "sup", "pdu", "dens", "desh"]) {
   document.getElementById(`btn-${key}`).addEventListener("click", () => setLayer(key));
 }
 document.getElementById("btn-home").addEventListener("click", () => {

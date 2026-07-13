@@ -79,6 +79,16 @@ function analyzeBuffer(lat, lng, radiusKm) {
   const demo = BufferCore.aggregateDemographics(agebRows);
   const pctSinAgeb = BufferCore.coverageSinAgeb(agebAreaKm2, areaKm2);
 
+  // Crecimiento poblacional 2010-2020: dato de contexto a nivel MUNICIPIO
+  // (no varía dentro del municipio), una vez por cada municipio que toca el buffer
+  const crecMunicipios = {};
+  for (const r of agebRows) {
+    const m = r.props.municipio;
+    if (r.props.crec_mun_2010_2020 != null && !(m in crecMunicipios)) {
+      crecMunicipios[m] = r.props.crec_mun_2010_2020;
+    }
+  }
+
   // Colonias catastrales que intersectan el buffer
   const colonias = [];
   for (const f of DATA.cat.features) {
@@ -131,7 +141,7 @@ function analyzeBuffer(lat, lng, radiusKm) {
 
   const stats = {
     lat, lng, radiusKm, areaKm2, agebRows, agebAreaKm2, pctSinAgeb,
-    demo, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
+    demo, crecMunicipios, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
   };
   bufferCache.set(key, stats);
   if (bufferCache.size > 30) bufferCache.delete(bufferCache.keys().next().value);
@@ -314,6 +324,11 @@ function bufferResultsHTML(s) {
     ? Object.entries(s.pois).map(([cat, n]) => `${cat} <strong>${n}</strong>`).join(" · ")
     : "POIs aún no cargados";
 
+  const crecEntries = Object.entries(s.crecMunicipios);
+  const crecTxt = crecEntries.length
+    ? crecEntries.map(([m, v]) => `${m} ${v >= 0 ? "+" : ""}${v}%`).join(" · ")
+    : "s/d";
+
   return `
     ${warn}
     <div class="zone-cards">
@@ -354,6 +369,8 @@ function bufferResultsHTML(s) {
     </div>
     <div class="zone-list"><strong>Vivienda nueva (${s.proyectos.length} proyectos, 1T26):</strong>${proyTxt}</div>
     <div class="zone-list"><strong>POIs en el radio:</strong><br>${poiTxt}</div>
+    <div class="zone-list"><strong>Crecimiento poblacional 2010–2020</strong> (dato del municipio
+      completo, no del radio): ${crecTxt}</div>
     <div class="zone-note">${NOTA_METODO_BUFFER}</div>`;
 }
 
@@ -531,6 +548,12 @@ function bufferCSVRows(s) {
   const F_POI = "OpenStreetMap contributors (ODbL)";
   for (const [cat, n] of Object.entries(s.pois)) {
     add(`poi_${cat.toLowerCase()}`, s.poisDisponibles ? n : null, "puntos", F_POI, "puntos dentro del radio");
+  }
+
+  const F_CENSO_2010 = "INEGI Censo 2010 y Censo 2020 (Total del municipio)";
+  const M_CREC = "variación % de población TOTAL del municipio 2010→2020; dato de contexto del municipio completo, no específico del radio";
+  for (const [m, v] of Object.entries(s.crecMunicipios)) {
+    add(`crecimiento_poblacional_2010_2020: ${m}`, v, "% (municipio completo)", F_CENSO_2010, M_CREC);
   }
 
   rows.push(["nota_metodologica", NOTA_METODO_BUFFER, "", "", ""]);

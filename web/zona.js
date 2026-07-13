@@ -122,12 +122,21 @@ function analyzeZone(polygon) {
     } catch (err) { /* omitir intersección fallida */ }
   }
 
+  // Crecimiento poblacional 2010-2020: dato de contexto a nivel MUNICIPIO
+  // (no varía dentro del municipio), una vez por cada municipio que toca la zona
+  const crecMunicipios = {};
+  for (const p of agebs) {
+    if (p.crec_mun_2010_2020 != null && !(p.municipio in crecMunicipios)) {
+      crecMunicipios[p.municipio] = p.crec_mun_2010_2020;
+    }
+  }
+
   return {
     areaKm2, nAgebs: agebs.length, pop, nivelPred,
     nseScore: scoreW ? scoreSum / scoreW : null,
     nseCounts, pct2dorm: nPct ? d2 / nPct : null, pct3cuart: nPct ? c3 / nPct : null,
     cols: cols.sort((a, b) => b.valor_m2 - a.valor_m2), catStats,
-    priceZones, pduShares,
+    priceZones, pduShares, crecMunicipios,
   };
 }
 
@@ -145,6 +154,11 @@ function renderZonePanel(s) {
     ? Object.entries(s.pduShares).sort((a, b) => b[1] - a[1]).slice(0, 4)
         .map(([g, km]) => `${g}: ${Math.round(km / pduTotal * 100)}%`).join(" · ")
     : "Sin cobertura del PDU";
+
+  const crecEntries = Object.entries(s.crecMunicipios);
+  const crecTxt = crecEntries.length
+    ? crecEntries.map(([m, v]) => `${m} ${v >= 0 ? "+" : ""}${v}%`).join(" · ")
+    : "s/d";
 
   el.innerHTML = `
     <div class="zone-cards">
@@ -165,7 +179,9 @@ function renderZonePanel(s) {
         <div class="zc-value">${s.pct3cuart != null ? s.pct3cuart.toFixed(0) + "%" : "s/d"}</div></div>
     </div>
     <div class="zone-list"><strong>Mercado:</strong><br>${priceTxt}</div>
-    <div class="zone-list"><strong>Uso de suelo (PDU):</strong> ${pduTxt}</div>`;
+    <div class="zone-list"><strong>Uso de suelo (PDU):</strong> ${pduTxt}</div>
+    <div class="zone-list"><strong>Crecimiento poblacional 2010–2020</strong> (dato del municipio
+      completo, no de la zona): ${crecTxt}</div>`;
 
   // mostrar el panel ANTES de crear los charts: con el panel oculto los
   // canvas miden 0x0 y las imágenes para el PDF salen corruptas

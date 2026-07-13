@@ -114,6 +114,20 @@ async function generarReportePDF() {
       y += 10;
     }
 
+    // crecimiento poblacional 2010-2020 (dato de contexto del municipio completo)
+    const crecEntries = Object.entries(s.crecMunicipios);
+    if (crecEntries.length) {
+      y += 9;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(110, 100, 130);
+      doc.text("Crecimiento poblacional 2010–2020 (municipio completo, no la zona)", MARGIN, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      const crecTxt = crecEntries.map(([m, v]) => `${m} ${v >= 0 ? "+" : ""}${v}%`).join(" · ");
+      doc.text(crecTxt, MARGIN, y + 4.5, { maxWidth: CONTENT_W });
+      y += 10;
+    }
+
     // captura del mapa
     await capturaMapaPDF(doc, y + 4);
 
@@ -375,6 +389,21 @@ async function generarReporteBufferPDF() {
       MARGIN + 2, 9, 1.5);
     y += 6;
 
+    need(14);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Crecimiento poblacional 2010–2020", MARGIN, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    const crecEntriesBuf = Object.entries(s.crecMunicipios);
+    parrafo(
+      crecEntriesBuf.length
+        ? crecEntriesBuf.map(([m, v]) => `${m}: ${v >= 0 ? "+" : ""}${v}%`).join("   ·   ") +
+          "  (dato del municipio completo, no específico del radio)"
+        : "s/d",
+      MARGIN + 2, 9, 1.5);
+    y += 6;
+
     need(34);
     doc.setFontSize(10.5);
     doc.setFont("helvetica", "bold");
@@ -387,6 +416,7 @@ async function generarReporteBufferPDF() {
       "NSE: proxy propio calculado con variables del Censo 2020 (INEGI). NO es la metodología oficial de AMAI y puede diferir del NSE real.",
       `Cobertura: el ${pct(s.pctSinAgeb, 0)} del área del radio no tiene AGEB urbana 2020 (fraccionamientos posteriores al censo o zona rural); en esa superficie no hay dato demográfico y los agregados subestiman la zona.`,
       "Valores catastrales: oficiales (Leyes de Ingresos 2026), pero el cruce nombre-polígono es automático y el valor catastral suele ser menor al precio de mercado. Verificar en la ley antes de un trámite.",
+      "Crecimiento poblacional 2010-2020: variación de población TOTAL del municipio completo (INEGI, censos 2010 y 2020), no del radio específico — se muestra como contexto, no como parte de la interpolación areal.",
       "Estimaciones con datos abiertos y un estudio de mercado de terceros (1T26). Este reporte NO es un avalúo.",
     ];
     for (const a of avisos) parrafo("· " + a, MARGIN, 8, 1.6);
