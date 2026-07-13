@@ -23,6 +23,7 @@ const BUFFER_RADII = [1, 2, 3, 5];
 let bufferRadius = 3;          // radio seleccionado (km)
 let bufferStats = null;        // análisis activo (null = sin buffer)
 let bufferPicking = false;     // esperando clic en el mapa
+window.bufferPicking = false;  // espejo público para main.js
 
 const bufferGroup = L.featureGroup().addTo(map);
 const bufferCache = new Map(); // "lat|lng|radio" -> stats
@@ -204,15 +205,20 @@ function onBufferMapClick(e) {
   map.closePopup();
   runBufferAnalysis(e.latlng.lat, e.latlng.lng, bufferRadius);
 }
+window.onBufferMapClick = onBufferMapClick;
 
 function startBufferPicking() {
   bufferPicking = true;
+  window.bufferPicking = true;
+  document.body.classList.add('buffer-picking');
   map.getContainer().style.cursor = "crosshair";
   map.on("click", onBufferMapClick);
 }
 
 function stopBufferPicking() {
   bufferPicking = false;
+  window.bufferPicking = false;
+  document.body.classList.remove('buffer-picking');
   map.getContainer().style.cursor = "";
   map.off("click", onBufferMapClick);
 }

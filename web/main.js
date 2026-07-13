@@ -276,12 +276,24 @@ async function loadData() {
   Object.assign(DATA, { agebs, zones, cat, pdu });
   buildColoniaIndex(cat);
 
+  // Helper: cuando bufferPicking está activo, el click en cualquier polígono
+  // se redirige al análisis de radio en lugar de abrir el popup.
+  function layerClick(e) {
+    if (window.bufferPicking) {
+      L.DomEvent.stopPropagation(e); // evita que Leaflet abra el popup
+      map.closePopup();
+      window.onBufferMapClick({ latlng: e.latlng });
+      return;
+    }
+  }
+
   nseLayer = L.geoJSON(agebs, {
     style: nseStyle,
     onEachFeature: (f, layer) => {
       layer.bindPopup(nsePopup(f.properties), { maxWidth: 290 });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2.2, color: "#1c2a3a" }));
-      layer.on("mouseout", () => nseLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#1c2a3a" }); });
+      layer.on("mouseout",  () => nseLayer.resetStyle(layer));
     },
   });
 
@@ -289,8 +301,9 @@ async function loadData() {
     style: priceStyle,
     onEachFeature: (f, layer) => {
       layer.bindPopup(pricePopup(f.properties), { maxWidth: 290 });
-      layer.on("mouseover", () => layer.setStyle({ fillOpacity: 0.72 }));
-      layer.on("mouseout", () => priceLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ fillOpacity: 0.72 }); });
+      layer.on("mouseout",  () => priceLayer.resetStyle(layer));
     },
   });
 
@@ -298,8 +311,9 @@ async function loadData() {
     style: catStyle,
     onEachFeature: (f, layer) => {
       layer.bindPopup(catPopup(f.properties), { maxWidth: 300 });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2, color: "#08306b" }));
-      layer.on("mouseout", () => catLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2, color: "#08306b" }); });
+      layer.on("mouseout",  () => catLayer.resetStyle(layer));
     },
   });
 
@@ -307,8 +321,9 @@ async function loadData() {
     style: pctStyle(REC_BINS, "pct_2dorm"),
     onEachFeature: (f, layer) => {
       layer.bindPopup(recPopup(f.properties), { maxWidth: 290 });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2.2, color: "#004d1f" }));
-      layer.on("mouseout", () => recLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#004d1f" }); });
+      layer.on("mouseout",  () => recLayer.resetStyle(layer));
     },
   });
 
@@ -316,8 +331,9 @@ async function loadData() {
     style: pctStyle(SUP_BINS, "pct_3cuart"),
     onEachFeature: (f, layer) => {
       layer.bindPopup(supPopup(f.properties), { maxWidth: 290 });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2.2, color: "#8c3200" }));
-      layer.on("mouseout", () => supLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#8c3200" }); });
+      layer.on("mouseout",  () => supLayer.resetStyle(layer));
     },
   });
 
@@ -325,8 +341,9 @@ async function loadData() {
     style: pduStyle,
     onEachFeature: (f, layer) => {
       layer.bindPopup(pduPopup(f.properties), { maxWidth: 310 });
-      layer.on("mouseover", () => layer.setStyle({ fillOpacity: 0.72 }));
-      layer.on("mouseout", () => pduLayer.resetStyle(layer));
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ fillOpacity: 0.72 }); });
+      layer.on("mouseout",  () => pduLayer.resetStyle(layer));
     },
   });
 

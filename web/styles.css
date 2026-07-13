@@ -153,6 +153,12 @@ body {
   inset: 0;
 }
 
+/* Modo radio activo: forzar crosshair en toda el área del mapa */
+body.buffer-picking #map,
+body.buffer-picking #map * {
+  cursor: crosshair !important;
+}
+
 /* ---------- Panel de capas ---------- */
 .layer-panel {
   position: absolute;
