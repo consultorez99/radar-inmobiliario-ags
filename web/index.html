@@ -121,71 +121,116 @@
 
     <!-- Leyendas flotantes -->
     <div class="legend" id="legend-nse">
-      <div class="legend-title">Nivel Socioeconómico (estimado)</div>
-      <div class="legend-rows" id="legend-nse-rows"></div>
-      <div class="legend-note">Proxy con datos del Censo 2020 (INEGI). No es la metodología AMAI.
-        Zonas en blanco: fuera de la delimitación de AGEB urbana 2020 (fraccionamientos nuevos o
-        áreas rurales en ese censo), sin dato disponible.</div>
+      <div class="legend-title legend-drag-handle">
+        Nivel Socioeconómico (estimado)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-nse-rows"></div>
+        <div class="legend-note">Proxy con datos del Censo 2020 (INEGI). No es la metodología AMAI.
+          Zonas en blanco: fuera de la delimitación de AGEB urbana 2020 (fraccionamientos nuevos o
+          áreas rurales en ese censo), sin dato disponible.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-price">
-      <div class="legend-title">Precio aproximado $/m² (jul 2026)</div>
-      <div class="legend-rows" id="legend-price-rows"></div>
-      <div class="legend-note">Estimación de mercado por zona. No es valor catastral ni avalúo.</div>
+      <div class="legend-title legend-drag-handle">
+        Precio aproximado $/m² (jul 2026)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-price-rows"></div>
+        <div class="legend-note">Estimación de mercado por zona. No es valor catastral ni avalúo.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-rec">
-      <div class="legend-title">Viviendas con 2+ recámaras</div>
-      <div class="legend-rows" id="legend-rec-rows"></div>
-      <div class="legend-note">% de viviendas habitadas con dos o más recámaras por AGEB.
-        Censo 2020 (INEGI).</div>
+      <div class="legend-title legend-drag-handle">
+        Viviendas con 2+ recámaras
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-rec-rows"></div>
+        <div class="legend-note">% de viviendas habitadas con dos o más recámaras por AGEB.
+          Censo 2020 (INEGI).</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-sup">
-      <div class="legend-title">Tamaño de vivienda (proxy)</div>
-      <div class="legend-rows" id="legend-sup-rows"></div>
-      <div class="legend-note">% de viviendas con 3+ cuartos por AGEB (Censo 2020). Proxy de
-        superficie construida — el m² real es dato catastral no público.</div>
+      <div class="legend-title legend-drag-handle">
+        Tamaño de vivienda (proxy)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-sup-rows"></div>
+        <div class="legend-note">% de viviendas con 3+ cuartos por AGEB (Censo 2020). Proxy de
+          superficie construida — el m² real es dato catastral no público.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-pdu">
-      <div class="legend-title">Planes de Desarrollo Urbano</div>
-      <div class="legend-rows" id="legend-pdu-rows"></div>
-      <div class="legend-note">Zonificación secundaria oficial: PDUCA 2040 ev.2 (Aguascalientes), PDU
-        Jesús María 2015-2035 (ciudad) y su Programa Municipal 2017-2040 (resto del municipio:
-        Margaritas, Maravillas, Colonia Nueva, etc.). Consultar el municipio para trámites.</div>
+      <div class="legend-title legend-drag-handle">
+        Planes de Desarrollo Urbano
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-pdu-rows"></div>
+        <div class="legend-note">Zonificación secundaria oficial: PDUCA 2040 ev.2 (Aguascalientes), PDU
+          Jesús María 2015-2035 (ciudad) y su Programa Municipal 2017-2040 (resto del municipio:
+          Margaritas, Maravillas, Colonia Nueva, etc.). Consultar el municipio para trámites.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-proyectos">
-      <div class="legend-title">Proyectos de vivienda nueva</div>
-      <div class="legend-rows">
-        <div class="legend-row"><span class="legend-dot" style="background:#2a9d8f"></span><span>Casas (horizontal)</span></div>
-        <div class="legend-row"><span class="legend-dot" style="background:#2f6690"></span><span>Departamentos (vertical)</span></div>
+      <div class="legend-title legend-drag-handle">
+        Proyectos de vivienda nueva
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
       </div>
-      <div class="legend-note">Los 72 proyectos vigentes que reporta el estudio de mercado de
-        terceros (1T26), con coordenadas oficiales tomadas de la ficha individual de cada
-        desarrollo en el reporte fuente. Se superpone a cualquier capa activa.</div>
+      <div class="legend-body">
+        <div class="legend-rows">
+          <div class="legend-row"><span class="legend-dot" style="background:#2a9d8f"></span><span>Casas (horizontal)</span></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#2f6690"></span><span>Departamentos (vertical)</span></div>
+        </div>
+        <div class="legend-note">Los 72 proyectos vigentes que reporta el estudio de mercado de
+          terceros (1T26), con coordenadas oficiales tomadas de la ficha individual de cada
+          desarrollo en el reporte fuente. Se superpone a cualquier capa activa.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-poi">
-      <div class="legend-title">Puntos de interés</div>
-      <div class="legend-rows" id="legend-poi-rows"></div>
-      <div class="legend-note">1,467 puntos de OpenStreetMap (escuelas, salud, abasto, bancos,
-        parques, gasolineras). Desmarca una categoría para ocultarla. Dato abierto (ODbL).</div>
+      <div class="legend-title legend-drag-handle">
+        Puntos de interés
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-poi-rows"></div>
+        <div class="legend-note">1,467 puntos de OpenStreetMap (escuelas, salud, abasto, bancos,
+          parques, gasolineras). Desmarca una categoría para ocultarla. Dato abierto (ODbL).</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-trafico">
-      <div class="legend-title">Tráfico en tiempo real</div>
-      <div class="legend-rows">
-        <div class="legend-row"><span class="legend-swatch" style="background:#2ecc40"></span><span>Fluido</span></div>
-        <div class="legend-row"><span class="legend-swatch" style="background:#ff851b"></span><span>Lento</span></div>
-        <div class="legend-row"><span class="legend-swatch" style="background:#ff4136"></span><span>Congestionado</span></div>
-        <div class="legend-row"><span class="legend-swatch" style="background:#85144b"></span><span>Detenido</span></div>
+      <div class="legend-title legend-drag-handle">
+        Tráfico en tiempo real
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
       </div>
-      <div class="legend-note">Velocidad actual vs. flujo libre, © TomTom. Telemetría comercial en
-        vivo — única capa del mapa que no es dato oficial/abierto.</div>
+      <div class="legend-body">
+        <div class="legend-rows">
+          <div class="legend-row"><span class="legend-swatch" style="background:#2ecc40"></span><span>Fluido</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background:#ff851b"></span><span>Lento</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background:#ff4136"></span><span>Congestionado</span></div>
+          <div class="legend-row"><span class="legend-swatch" style="background:#85144b"></span><span>Detenido</span></div>
+        </div>
+        <div class="legend-note">Velocidad actual vs. flujo libre, © TomTom. Telemetría comercial en
+          vivo — única capa del mapa que no es dato oficial/abierto.</div>
+      </div>
     </div>
     <div class="legend hidden" id="legend-cat">
-      <div class="legend-title">Valor catastral de suelo 2026 ($/m²)</div>
-      <div class="legend-rows" id="legend-cat-rows"></div>
-      <div class="legend-note">Valores oficiales por colonia (Leyes de Ingresos 2026 de
-        Aguascalientes y Jesús María). Base del impuesto predial; normalmente por debajo del
-        precio de mercado. Zonas grises: sin colonia delimitada o sin cruce con la tabla.
-        <br><strong>Tip:</strong> clic en una colonia y usa "Comparar" en su popup (hasta 4
-        colonias) para abrir el comparador.</div>
+      <div class="legend-title legend-drag-handle">
+        Valor catastral de suelo 2026 ($/m²)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-cat-rows"></div>
+        <div class="legend-note">Valores oficiales por colonia (Leyes de Ingresos 2026 de
+          Aguascalientes y Jesús María). Base del impuesto predial; normalmente por debajo del
+          precio de mercado. Zonas grises: sin colonia delimitada o sin cruce con la tabla.
+          <br><strong>Tip:</strong> clic en una colonia y usa "Comparar" en su popup (hasta 4
+          colonias) para abrir el comparador.</div>
+      </div>
     </div>
   </div>
 
@@ -288,5 +333,77 @@
   <script src="trafico.js?v=4"></script>
   <script src="buffer-core.js?v=1"></script>
   <script src="buffer.js?v=1"></script>
+
+  <script>
+    /* ---- Minimizar / Expandir leyenda ---- */
+    function toggleLegend(btn) {
+      const legend = btn.closest('.legend');
+      legend.classList.toggle('collapsed');
+    }
+
+    /* ---- Arrastre de leyendas ---- */
+    function makeLegendsDraggable() {
+      document.querySelectorAll('.legend').forEach(legend => {
+        const handle = legend.querySelector('.legend-drag-handle');
+        if (!handle) return;
+
+        handle.addEventListener('mousedown', startDrag);
+        handle.addEventListener('touchstart', startDrag, { passive: false });
+
+        function startDrag(e) {
+          // Si el click es en el botón de toggle, no arrastramos
+          if (e.target.closest('.legend-toggle-btn')) return;
+
+          e.preventDefault();
+          const isTouch = e.type === 'touchstart';
+          const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+          const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+
+          // Convertir a fixed si aún es absolute
+          if (getComputedStyle(legend).position !== 'fixed') {
+            const rect = legend.getBoundingClientRect();
+            legend.style.position = 'fixed';
+            legend.style.left = rect.left + 'px';
+            legend.style.top  = rect.top  + 'px';
+            legend.style.bottom = 'auto';
+            legend.style.right  = 'auto';
+          }
+
+          const startX = clientX - legend.offsetLeft;
+          const startY = clientY - legend.offsetTop;
+
+          legend.classList.add('is-dragging');
+
+          function onMove(ev) {
+            const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+            const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+            // Limitar dentro del viewport
+            const maxX = window.innerWidth  - legend.offsetWidth;
+            const maxY = window.innerHeight - legend.offsetHeight;
+            const newX = Math.max(0, Math.min(maxX, cx - startX));
+            const newY = Math.max(0, Math.min(maxY, cy - startY));
+            legend.style.left = newX + 'px';
+            legend.style.top  = newY + 'px';
+          }
+
+          function onEnd() {
+            legend.classList.remove('is-dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup',   onEnd);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend',  onEnd);
+          }
+
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup',   onEnd);
+          document.addEventListener('touchmove', onMove, { passive: false });
+          document.addEventListener('touchend',  onEnd);
+        }
+      });
+    }
+
+    // Activar al cargar
+    document.addEventListener('DOMContentLoaded', makeLegendsDraggable);
+  </script>
 </body>
 </html>
