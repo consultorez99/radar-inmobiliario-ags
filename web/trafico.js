@@ -14,6 +14,15 @@
 
 "use strict";
 
+// Zona de cobertura de la app (Aguascalientes + Jesús María, mismo bbox que
+// scripts/build_poi.py y scripts/geocode_softec_proyectos.py). El mapa en sí
+// no está acotado a esta zona (se puede hacer pan/zoom libremente para dar
+// contexto), pero la capa de tráfico SÍ se limita a ella: es telemetría
+// comercial de un tercero con cuota gratuita diaria, y el sitio se llama
+// "Radar Inmobiliario · Aguascalientes" — no debe poder usarse como visor de
+// tráfico de otras ciudades (GDL, CDMX, etc.) a costa de esa cuota.
+const TRAFICO_BOUNDS = L.latLngBounds([21.75, -102.42], [21.98, -102.15]);
+
 let traficoLayer = null;
 let traficoVisible = false;
 let traficoSegmento = null;  // polyline resaltada del último clic
@@ -37,6 +46,7 @@ function nivelTrafico(actual, libre) {
 
 async function consultarSegmento(e) {
   if (!traficoVisible) return;
+  if (!TRAFICO_BOUNDS.contains(e.latlng)) return; // fuera de AGS/Jesús María: no gastar cuota de TomTom
   const { lat, lng } = e.latlng;
   try {
     const r = await fetch(
@@ -83,6 +93,7 @@ function buildTraficoLayer() {
     {
       maxZoom: 19,
       opacity: 0.85,
+      bounds: TRAFICO_BOUNDS, // no pide tiles fuera de AGS/Jesús María
       attribution: 'Tráfico © <a href="https://www.tomtom.com">TomTom</a>',
     }
   );

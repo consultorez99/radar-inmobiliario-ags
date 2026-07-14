@@ -835,6 +835,16 @@ body.buffer-picking #map * {
   margin-top: 2px;
 }
 
+/* punto central arrastrable del radio */
+.buffer-center-marker {
+  border-radius: 50%;
+  background: var(--ink);
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.buffer-center-marker:active { cursor: grabbing; }
+
 /* ---------- Comparador ---------- */
 .compare-panel {
   position: absolute;
@@ -898,6 +908,91 @@ body.buffer-picking #map * {
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-style: italic;
+}
+
+/* ---------- Dibujar zona de estudio (Leaflet.Draw) ---------- */
+/* El estilo de fábrica de Leaflet.Draw (barra "Finish/Cancel" gris, tooltip
+   negro genérico, vértices cuadrados) no combina con el resto de la UI.
+   Se reemplaza visualmente sin tocar el comportamiento de la librería. */
+
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon {
+  background-image: none !important;
+  position: relative;
+  border-radius: 4px;
+}
+
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 17px;
+  height: 17px;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c2a3a' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 8 L12 4 L20 9 L18 18 L7 19 Z'/%3E%3Ccircle cx='5' cy='8' r='1.5' fill='%231c2a3a' stroke='none'/%3E%3Ccircle cx='12' cy='4' r='1.5' fill='%231c2a3a' stroke='none'/%3E%3Ccircle cx='20' cy='9' r='1.5' fill='%231c2a3a' stroke='none'/%3E%3Ccircle cx='18' cy='18' r='1.5' fill='%231c2a3a' stroke='none'/%3E%3Ccircle cx='7' cy='19' r='1.5' fill='%231c2a3a' stroke='none'/%3E%3C/svg%3E");
+}
+
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon.leaflet-draw-toolbar-button-enabled {
+  background-color: var(--accent-soft) !important;
+}
+
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon:hover::before,
+.leaflet-draw-toolbar a.leaflet-draw-draw-polygon.leaflet-draw-toolbar-button-enabled::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232f6690' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 8 L12 4 L20 9 L18 18 L7 19 Z'/%3E%3Ccircle cx='5' cy='8' r='1.5' fill='%232f6690' stroke='none'/%3E%3Ccircle cx='12' cy='4' r='1.5' fill='%232f6690' stroke='none'/%3E%3Ccircle cx='20' cy='9' r='1.5' fill='%232f6690' stroke='none'/%3E%3Ccircle cx='18' cy='18' r='1.5' fill='%232f6690' stroke='none'/%3E%3Ccircle cx='7' cy='19' r='1.5' fill='%232f6690' stroke='none'/%3E%3C/svg%3E");
+}
+
+/* tooltip flotante ("Haz clic para empezar a dibujar...") */
+.leaflet-draw-tooltip {
+  background: var(--ink);
+  border: none;
+  border-radius: 6px;
+  font: 500 12px/1.4 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 5px 10px;
+  box-shadow: 0 2px 10px rgba(20, 30, 42, 0.25);
+}
+.leaflet-draw-tooltip:before { border-right-color: var(--ink); }
+.leaflet-draw-tooltip-subtext { color: #b9c2cc; }
+
+.leaflet-error-draw-tooltip {
+  background: #fef3e2;
+  border: 1px solid #f5c98a;
+  color: #8a4b08;
+}
+.leaflet-error-draw-tooltip:before { border-right-color: #f5c98a; }
+
+/* barra de acciones (Finish / Delete last point / Cancel) */
+.leaflet-draw-actions a {
+  background: #fff;
+  color: var(--ink);
+  border-left: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  font: 600 12px/26px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  height: 26px;
+  padding: 0 12px;
+  margin-left: 6px;
+  box-shadow: var(--shadow);
+}
+.leaflet-draw-actions li:first-child a { margin-left: 0; }
+.leaflet-draw-actions a:hover { background: var(--surface-hover); }
+
+.leaflet-draw-actions li:first-child a {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.leaflet-draw-actions li:first-child a:hover { background: #285a80; }
+
+/* vértices mientras se traza el polígono */
+.leaflet-editing-icon {
+  background: var(--accent) !important;
+  border: 1.5px solid #fff !important;
+  border-radius: 50%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 1px rgba(28, 42, 58, 0.35);
 }
 
 .hidden { display: none !important; }

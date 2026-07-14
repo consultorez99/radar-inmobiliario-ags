@@ -27,6 +27,7 @@ window.bufferPicking = false;  // espejo público para main.js
 
 const bufferGroup = L.featureGroup().addTo(map);
 const bufferCache = new Map(); // "lat|lng|radio" -> stats
+let bufferDragPreview = null; // círculo ligero mostrado mientras se arrastra el centro
 
 const NOTA_METODO_BUFFER =
   "Estimaciones con datos abiertos, no un avalúo ni conteo exacto. Las variables " +
@@ -168,10 +169,39 @@ function drawBuffer(stats) {
     style: { color: "#1c2a3a", weight: 2.5, fillColor: "#2f6690", fillOpacity: 0.05 },
   }).addTo(bufferGroup);
 
-  L.circleMarker([stats.lat, stats.lng], {
-    interactive: false,
-    radius: 6, color: "#ffffff", weight: 2.5, fillColor: "#1c2a3a", fillOpacity: 1,
+  // L.circleMarker es un Path (SVG): Leaflet core no lo hace arrastrable sin
+  // el plugin Path.Drag. Se usa un L.Marker con un icono que se ve igual —
+  // L.Marker sí soporta `draggable` de forma nativa.
+  const centerMarker = L.marker([stats.lat, stats.lng], {
+    icon: L.divIcon({ className: "buffer-center-marker", iconSize: [16, 16], iconAnchor: [8, 8] }),
+    draggable: true,
+    keyboard: false,
+    title: "Arrastra para mover el radio",
   }).addTo(bufferGroup);
+  centerMarker.on("dragstart", onBufferCenterDragStart);
+  centerMarker.on("drag", onBufferCenterDrag);
+  centerMarker.on("dragend", onBufferCenterDragEnd);
+}
+
+// arrastrar el punto central: mueve el radio a la nueva ubicación. Durante el
+// arrastre se muestra un círculo simple (barato) en vez de recalcular todo en
+// cada frame; el análisis completo se recalcula solo al soltar.
+function onBufferCenterDragStart(e) {
+  bufferDragPreview = L.circle(e.target.getLatLng(), {
+    radius: bufferRadius * 1000,
+    interactive: false,
+    color: "#1c2a3a", weight: 2, dashArray: "5 4", fillColor: "#2f6690", fillOpacity: 0.05,
+  }).addTo(bufferGroup);
+}
+
+function onBufferCenterDrag(e) {
+  if (bufferDragPreview) bufferDragPreview.setLatLng(e.target.getLatLng());
+}
+
+function onBufferCenterDragEnd(e) {
+  if (bufferDragPreview) { bufferGroup.removeLayer(bufferDragPreview); bufferDragPreview = null; }
+  const { lat, lng } = e.target.getLatLng();
+  runBufferAnalysis(lat, lng, bufferRadius, { fit: false });
 }
 
 // --------------------------------------------------------------- ejecución
