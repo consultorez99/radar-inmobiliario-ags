@@ -8,6 +8,12 @@ Genera los datos del mapa de geozonas de Aguascalientes:
                                     - Densidad de población (hab/km²)
                                     - Crecimiento poblacional 2010–2020
                                       (nivel municipio del ITER 2010 nacional)
+                                    - Población por sexo, grupos de edad
+                                      (0-14/15-24/25-59/60+ — ver nota de
+                                      cortes en el docstring de load_census),
+                                      discapacidad, vivienda y calidad de
+                                      vivienda (piso/electricidad/sanitario/
+                                      drenaje)
   2. data/ags_price_zones.geojson — 6 zonas de precio aproximado ($/m²)
 
 IMPORTANTE: el NSE aquí calculado es un PROXY PROPIO basado en datos abiertos.
@@ -65,6 +71,26 @@ def load_agebs():
 
 
 # ------------------------------------------------------------------- censo
+#
+# NOTA SOBRE CORTES DE EDAD: el ITER urbano NO trae quinquenios completos —
+# solo P_0A2, P_3A5, P_6A11, P_12A14, P_15A17, P_18A24, P_60YMAS (más un
+# P_8A14 que SE TRASLAPA con P_6A11/P_12A14 y no debe sumarse con ellos) y
+# el bucket ya calculado POB0_14. No existe ningún corte entre 25 y 29, así
+# que la partición 0-14/15-29/30-59/60+ que pide el formato de reporte NO es
+# reproducible exacta con este dato. La partición más fina que SÍ es exacta
+# y sin traslapes es:
+#   pob_0_14   = POB0_14                              (exacto)
+#   pob_15_24  = P_15A17 + P_18A24                     (sustituye "15-29",
+#                                                        falta el quinquenio
+#                                                        25-29)
+#   pob_25_59  = POBTOT − pob_0_14 − pob_15_24 − 60+   (sustituye "30-59",
+#                                                        absorbe el 25-29
+#                                                        que no se pudo
+#                                                        separar)
+#   pob_60_mas = P_60YMAS                              (exacto; OJO: no
+#                                                        confundir con
+#                                                        POB65_MAS, que
+#                                                        subcontaría)
 def load_census():
     df = pd.read_csv(ITER_CSV, dtype=str)
     # Nivel AGEB (no manzana, no totales de localidad/municipio)
@@ -79,10 +105,13 @@ def load_census():
 
     # INEGI usa "*" (dato confidencial) y "N/D" — se convierten a NaN
     num_cols = [
-        "POBTOT", "VIVTOT", "TVIVPARHAB", "VIVPAR_DES", "VIVPAR_HAB",
+        "POBTOT", "POBFEM", "POBMAS",
+        "VIVTOT", "TVIVPAR", "TVIVPARHAB", "VIVPAR_DES", "VIVPAR_HAB",
         "GRAPROES", "PRO_OCUP_C",
         "VPH_INTER", "VPH_PC", "VPH_AUTOM", "VPH_C_SERV",
         "VPH_2YMASD", "VPH_3YMASC",
+        "VPH_PISODT", "VPH_C_ELEC", "VPH_EXCSA", "VPH_DRENAJ",
+        "POB0_14", "P_15A17", "P_18A24", "P_60YMAS", "PCON_DISC",
         "MUN",
     ]
     for c in num_cols:
@@ -97,12 +126,22 @@ def load_census():
     df["pct_serv"]  = df["VPH_C_SERV"] / viv
     df["pct_2dorm"]  = df["VPH_2YMASD"] / viv
     df["pct_3cuart"] = df["VPH_3YMASC"] / viv
+    df["pct_piso_firme"]   = df["VPH_PISODT"] / viv
+    df["pct_electricidad"] = df["VPH_C_ELEC"] / viv
+    df["pct_sanitario"]    = df["VPH_EXCSA"] / viv
+    df["pct_drenaje"]      = df["VPH_DRENAJ"] / viv
 
     # --- Viviendas deshabitadas ---
     # VIVPAR_DES / TVIVPAR: deshabitadas sobre total de particulares
     # (TVIVPAR = VIVPAR_HAB + VIVPAR_DES + VIVPAR_UT)
-    tvivpar = pd.to_numeric(df["TVIVPAR"], errors="coerce").replace(0, np.nan)
+    tvivpar = df["TVIVPAR"].replace(0, np.nan)
     df["pct_deshabitadas"] = (df["VIVPAR_DES"] / tvivpar * 100).round(1)
+
+    # --- Grupos de edad (ver nota arriba: sustituto documentado de 15-29/30-59) ---
+    df["pob_0_14"] = df["POB0_14"]
+    df["pob_15_24"] = df["P_15A17"] + df["P_18A24"]
+    df["pob_60_mas"] = df["P_60YMAS"]
+    df["pob_25_59"] = df["POBTOT"] - df["pob_0_14"] - df["pob_15_24"] - df["pob_60_mas"]
 
     return df
 
@@ -287,16 +326,24 @@ def main():
     print(gdf["municipio"].value_counts().to_string())
 
     census = compute_nse(load_census())
-    keep = ["CVEGEO", "POBTOT", "TVIVPARHAB", "GRAPROES", "PRO_OCUP_C",
+    keep = ["CVEGEO", "POBTOT", "POBFEM", "POBMAS", "TVIVPARHAB",
+            "VIVTOT", "TVIVPAR",
+            "GRAPROES", "PRO_OCUP_C",
             "pct_inter", "pct_pc", "pct_auto", "pct_serv",
             "pct_2dorm", "pct_3cuart", "nse_score", "nse_nivel",
-            "pct_deshabitadas", "MUN"]
+            "pct_deshabitadas",
+            "pct_piso_firme", "pct_electricidad", "pct_sanitario", "pct_drenaje",
+            "pob_0_14", "pob_15_24", "pob_25_59", "pob_60_mas", "PCON_DISC",
+            "MUN"]
     gdf = gdf.merge(census[keep], on="CVEGEO", how="left")
     matched = gdf["nse_score"].notna().sum()
     print(f"AGEBs con datos censales: {matched} / {len(gdf)}")
     gdf["nse_nivel"] = gdf["nse_nivel"].fillna("S/D")
-    for c in ["pct_inter", "pct_pc", "pct_auto", "pct_serv", "pct_2dorm", "pct_3cuart"]:
+    pct_cols = ["pct_inter", "pct_pc", "pct_auto", "pct_serv", "pct_2dorm", "pct_3cuart",
+                "pct_piso_firme", "pct_electricidad", "pct_sanitario", "pct_drenaje"]
+    for c in pct_cols:
         gdf[c] = (gdf[c] * 100).round(1)
+    gdf = gdf.rename(columns={"PCON_DISC": "pob_discapacidad"})
 
     # --- Densidad de población (hab/km²) ---
     # Proyectamos a EPSG:6372 (MTM México, unidades en metros) para áreas reales
@@ -329,6 +376,14 @@ def main():
             "pct_serv", "pct_2dorm", "pct_3cuart",
             "nse_score", "nse_nivel",
             "pct_deshabitadas", "densidad_hab_km2", "crec_mun_2010_2020",
+            # --- campos agregados para la tabla "Población/Vivienda en la
+            # zona de influencia" de los estudios de mercado (ver nota de
+            # cortes de edad arriba de load_census) ---
+            "POBFEM", "POBMAS",
+            "pob_0_14", "pob_15_24", "pob_25_59", "pob_60_mas",
+            "pob_discapacidad",
+            "VIVTOT", "TVIVPAR",
+            "pct_piso_firme", "pct_electricidad", "pct_sanitario", "pct_drenaje",
             "geometry"]
     gdf[cols].to_file(OUT_AGEBS, driver="GeoJSON")
     zones.to_file(OUT_ZONES, driver="GeoJSON")

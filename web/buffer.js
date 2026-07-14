@@ -28,11 +28,8 @@ window.bufferPicking = false;  // espejo público para main.js
 const bufferGroup = L.featureGroup().addTo(map);
 const bufferCache = new Map(); // "lat|lng|radio" -> stats
 
-const NOTA_METODO_BUFFER =
-  "Estimaciones con datos abiertos, no un avalúo ni conteo exacto. Las variables " +
-  "censales se ponderan por la fracción del área de cada AGEB dentro del radio " +
-  "(interpolación areal), asumiendo distribución uniforme dentro del AGEB. El NSE " +
-  "es un proxy propio con Censo 2020 (INEGI), no la metodología AMAI.";
+// Vive en buffer-core.js (single source of truth, la usa también el JSON)
+const NOTA_METODO_BUFFER = BufferCore.NOTA_METODO_BUFFER;
 
 // --------------------------------------------------------------- geometría
 function bufferCircle(lat, lng, radiusKm) {
@@ -204,6 +201,8 @@ window.clearBufferAnalysis = function (hidePanel = true) {
   stopBufferPicking();
   document.getElementById("btn-buffer").classList.remove("active");
   document.getElementById("btn-csv").classList.add("hidden");
+  document.getElementById("btn-json").classList.add("hidden");
+  document.getElementById("btn-png").classList.add("hidden");
   if (hidePanel && !currentZone) {
     document.getElementById("zone-panel").classList.add("hidden");
   }
@@ -378,6 +377,8 @@ function renderBufferPanel(s) {
   const el = document.getElementById("zone-stats");
   el.innerHTML = bufferFormHTML(s) + (s ? bufferResultsHTML(s) : "");
   document.getElementById("btn-csv").classList.toggle("hidden", !s);
+  document.getElementById("btn-json").classList.toggle("hidden", !s);
+  document.getElementById("btn-png").classList.toggle("hidden", !s);
   document.getElementById("zone-panel").classList.remove("hidden");
 
   // interacción del formulario
@@ -477,88 +478,10 @@ function renderBufferCharts(s) {
 }
 
 // --------------------------------------------------------------------- CSV
-function csvEscape(v) {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function bufferCSVRows(s) {
-  const d = s.demo;
-  const F_CENSO = "INEGI Censo 2020 (AGEB urbana)";
-  const M_AREAL = "interpolación areal: variable ponderada por fracción de área del AGEB dentro del radio (asume distribución uniforme)";
-  const M_GEO = "geometría del buffer circular";
-  const rows = [["metrica", "valor", "unidad", "fuente", "metodo"]];
-  const add = (m, v, u, f, met) => rows.push([m, v ?? "s/d", u, f, met]);
-
-  add("punto_lat", s.lat.toFixed(6), "grados", "usuario", "punto central del análisis");
-  add("punto_lng", s.lng.toFixed(6), "grados", "usuario", "punto central del análisis");
-  add("radio", s.radiusKm, "km", "usuario", "radio del buffer");
-  add("area_buffer", s.areaKm2.toFixed(2), "km²", "cálculo propio", M_GEO);
-  add("agebs_intersectadas", s.agebRows.length, "AGEBs", F_CENSO, "AGEBs con intersección no vacía con el buffer");
-  add("pct_area_sin_ageb", s.pctSinAgeb?.toFixed(1), "% del área del buffer", F_CENSO,
-    "área del buffer no cubierta por AGEB urbana 2020; si es alto, los agregados subestiman la zona");
-
-  add("poblacion_estimada", Math.round(d.pop), "habitantes", F_CENSO, M_AREAL);
-  add("viviendas_habitadas_estimadas", Math.round(d.viviendas), "viviendas particulares habitadas", F_CENSO, M_AREAL);
-  add("escolaridad_promedio", d.escolaridad?.toFixed(2), "años", F_CENSO, M_AREAL + "; ponderada por población");
-  add("ocupantes_por_cuarto", d.ocupCuarto?.toFixed(2), "ocupantes/cuarto", F_CENSO, M_AREAL + "; ponderado por viviendas");
-  const pcts = [
-    ["pct_viviendas_internet", d.pctInter], ["pct_viviendas_computadora", d.pctPc],
-    ["pct_viviendas_automovil", d.pctAuto], ["pct_viviendas_servicios_completos", d.pctServ],
-    ["pct_viviendas_2mas_recamaras", d.pct2dorm], ["pct_viviendas_3mas_cuartos", d.pct3cuart],
-  ];
-  for (const [m, v] of pcts) add(m, v?.toFixed(1), "% de viviendas habitadas", F_CENSO, M_AREAL + "; ponderado por viviendas");
-
-  for (const nivel of Object.keys(NSE_LABELS)) {
-    if (d.nsePct[nivel] == null) continue;
-    add(`nse_${nivel}_pct_poblacion`, d.nsePct[nivel].toFixed(1), "% de población",
-      "NSE proxy propio con Censo 2020 (no AMAI)", M_AREAL);
-  }
-
-  const F_CAT = "Leyes de Ingresos 2026 (Aguascalientes y Jesús María)";
-  const M_CAT = "colonias cuyo polígono intersecta el buffer (cruce nombre-polígono automático)";
-  if (s.catStats) {
-    add("catastral_colonias", s.catStats.n, "colonias", F_CAT, M_CAT);
-    add("catastral_min", s.catStats.min, "$/m² de suelo", F_CAT, M_CAT);
-    add("catastral_mediana", s.catStats.med, "$/m² de suelo", F_CAT, M_CAT);
-    add("catastral_max", s.catStats.max, "$/m² de suelo", F_CAT, M_CAT);
-  }
-  for (const c of s.colonias) {
-    add(`colonia: ${c.TIPO !== "NINGUNO" ? c.TIPO + " " : ""}${c.NOM_ASEN} (${c.municipio})`,
-      c.valor_m2, "$/m² de suelo", F_CAT, M_CAT);
-  }
-
-  const F_PDU = "PDUCA 2040 ev.2 / PDU Cd. Jesús María 2015-2035 / PMDU Jesús María 2017-2040";
-  for (const [g, v] of Object.entries(s.pdu).sort((a, b) => b[1].km2 - a[1].km2)) {
-    for (const [prog, km] of Object.entries(v.programas)) {
-      add(`uso_suelo: ${g} — ${prog}`, (km / s.areaKm2 * 100).toFixed(1), "% del área del buffer",
-        F_PDU, "área de intersección de la zonificación con el buffer");
-    }
-  }
-  add("uso_suelo: sin zonificación PDU", Math.max(0, 100 - s.pduAreaKm2 / s.areaKm2 * 100).toFixed(1),
-    "% del área del buffer", F_PDU, "resto del área del buffer sin polígono de PDU");
-
-  const F_SOFTEC = "estudio de mercado de terceros, corte 1T26 (coordenada oficial por proyecto)";
-  add("proyectos_vivienda_nueva", s.proyectos.length, "proyectos", F_SOFTEC, "puntos dentro del radio");
-  for (const p of s.proyectos) {
-    add(`proyecto: ${p.nombre} (${p.tipo})`, p.distKm.toFixed(2), "km al punto central", F_SOFTEC,
-      "distancia geodésica al punto central");
-  }
-
-  const F_POI = "OpenStreetMap contributors (ODbL)";
-  for (const [cat, n] of Object.entries(s.pois)) {
-    add(`poi_${cat.toLowerCase()}`, s.poisDisponibles ? n : null, "puntos", F_POI, "puntos dentro del radio");
-  }
-
-  const F_CENSO_2010 = "INEGI Censo 2010 y Censo 2020 (Total del municipio)";
-  const M_CREC = "variación % de población TOTAL del municipio 2010→2020; dato de contexto del municipio completo, no específico del radio";
-  for (const [m, v] of Object.entries(s.crecMunicipios)) {
-    add(`crecimiento_poblacional_2010_2020: ${m}`, v, "% (municipio completo)", F_CENSO_2010, M_CREC);
-  }
-
-  rows.push(["nota_metodologica", NOTA_METODO_BUFFER, "", "", ""]);
-  return rows;
-}
+// bufferCSVRows/buildZonaAgregados/buildZonaEstudioJSON viven en
+// buffer-core.js (pure, testeables en Node) — aquí solo se consumen.
+const csvEscape = BufferCore.csvEscape;
+const bufferCSVRows = BufferCore.bufferCSVRows;
 
 function exportBufferCSV() {
   if (!bufferStats) return;
@@ -575,3 +498,21 @@ function exportBufferCSV() {
 }
 
 document.getElementById("btn-csv").addEventListener("click", exportBufferCSV);
+
+// --------------------------------------------------------------------- JSON
+// Mismo objeto (buildZonaAgregados) que arma el CSV — ver
+// CONTRATO_ZONA_ESTUDIO.md para el esquema documentado y schema_version.
+function exportBufferJSON() {
+  if (!bufferStats) return;
+  const json = BufferCore.buildZonaEstudioJSON(bufferStats);
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `zona-influencia_${bufferStats.lat.toFixed(5)}_${bufferStats.lng.toFixed(5)}_${bufferStats.radiusKm}km.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById("btn-json").addEventListener("click", exportBufferJSON);

@@ -51,6 +51,79 @@ async function capturaMapaPDF(doc, y) {
   }
 }
 
+/* ------------------------------------------------------------------------
+ * Export "Exportar mapa PNG": captura del mapa (círculo/AGEBs resaltadas o
+ * polígono dibujado, marcador central si es buffer, barra de escala y
+ * atribución) como imagen independiente para insertar en un Word/reporte.
+ *
+ * A diferencia de capturaMapaPDF (que excluye TODO .leaflet-control-container
+ * porque el mapa va embebido dentro de un layout de PDF con su propia
+ * atribución en el pie), aquí SÍ se conservan la barra de escala y la
+ * atribución — el usuario pidió que la imagen sea autocontenida.
+ *
+ * Resolución: se calcula un factor de escala de html2canvas para garantizar
+ * como mínimo 1200px de ancho (tamaño carta a buena densidad), usando 2x
+ * como piso de nitidez aunque el contenedor ya sea ancho.
+ *
+ * CORS: el tile layer de OSM (main.js) ya se carga con crossOrigin:true
+ * específicamente para que html2canvas pueda leer los tiles — es el mismo
+ * mecanismo que ya usa capturaMapaPDF con éxito. Si algún día un tile
+ * bloquea el canvas (tileLayer sin CORS, o un proveedor que lo prohíba), el
+ * síntoma es un canvas "tainted": toDataURL lanza SecurityError o el PNG
+ * sale con el fondo del mapa en blanco. En ese caso, la solución sería
+ * cambiar SOLO para este export a un tile layer que si autorice CORS
+ * (p.ej. Carto/Stadia con licencia adecuada) — no ha sido necesario aquí
+ * porque el mismo mecanismo ya funciona para el PDF.
+ */
+async function exportarMapaPNG() {
+  const btn = document.getElementById("btn-png");
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Generando…";
+
+  try {
+    const mapEl = document.getElementById("map");
+    const anchoActual = mapEl.clientWidth || 800;
+    const scale = Math.max(2, Math.ceil(1200 / anchoActual));
+
+    const canvas = await html2canvas(mapEl, {
+      useCORS: true, scale, logging: false,
+      ignoreElements: (el) => el.classList && (
+        el.classList.contains("zone-panel") || el.classList.contains("compare-panel") ||
+        el.classList.contains("legend") || el.classList.contains("layer-panel") ||
+        el.classList.contains("leaflet-control-zoom") ||
+        el.classList.contains("leaflet-draw") || el.classList.contains("leaflet-draw-toolbar")),
+    });
+
+    if (canvas.width < 1200) {
+      console.warn(`Export PNG: ancho ${canvas.width}px, por debajo del mínimo de 1200px solicitado.`);
+    }
+
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    const punto = window.getBufferStats?.()
+      ? `${bufferStats.lat.toFixed(5)}_${bufferStats.lng.toFixed(5)}_${bufferStats.radiusKm}km`
+      : "poligono";
+    a.href = url;
+    a.download = `mapa-zona-estudio_${punto}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (err) {
+    console.error(err);
+    alert(
+      "No se pudo exportar el mapa como PNG. Si el problema persiste, puede " +
+      "deberse a que el proveedor de tiles del mapa base bloqueó la captura " +
+      "por CORS (ver comentario en exportarMapaPNG, web/reporte.js)."
+    );
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
+document.getElementById("btn-png").addEventListener("click", exportarMapaPNG);
+
 async function generarReportePDF() {
   if (!currentStats) return null;
   const btn = document.getElementById("btn-report");
@@ -283,7 +356,86 @@ async function generarReporteBufferPDF() {
 
     await capturaMapaPDF(doc, y);
 
-    // ---------------- página 2: contexto inmobiliario ----------------
+    // ---------------- página 2: población y vivienda, detalle ampliado ----
+    // Mismos números que el CSV/JSON (BufferCore.buildZonaAgregados) — misma
+    // sección conceptual "Indicadores demográficos" de la página 1, en
+    // página aparte para no desbordar el layout existente.
+    const ag = BufferCore.buildZonaAgregados(s);
+    doc.addPage();
+    pdfHeader(doc, "Zona de influencia — población y vivienda (detalle ampliado)");
+    y = 30;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Población por sexo, edad y discapacidad", MARGIN, y);
+    y += 3;
+
+    const cardsPob = [
+      ["Población femenina", fmt(ag.demografia.poblacionFemenina) + " hab"],
+      ["Población masculina", fmt(ag.demografia.poblacionMasculina) + " hab"],
+      ["Población 0-14 años", fmt(ag.demografia.gruposEdad["0_14"]) + " hab"],
+      ["Población 15-24 años *", fmt(ag.demografia.gruposEdad["15_24"]) + " hab"],
+      ["Población 25-59 años *", fmt(ag.demografia.gruposEdad["25_59"]) + " hab"],
+      ["Población 60+ años", fmt(ag.demografia.gruposEdad["60_mas"]) + " hab"],
+      ["Población con discapacidad", fmt(ag.demografia.poblacionConDiscapacidad) + " hab"],
+    ];
+    doc.setFontSize(9.5);
+    for (let i = 0; i < cardsPob.length; i += 2) {
+      y += 8;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(110, 100, 130);
+      doc.text(cardsPob[i][0], MARGIN, y);
+      if (cardsPob[i + 1]) doc.text(cardsPob[i + 1][0], MARGIN + CONTENT_W / 2, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      doc.text(String(cardsPob[i][1]), MARGIN, y + 4.5, { maxWidth: CONTENT_W / 2 - 6 });
+      if (cardsPob[i + 1]) doc.text(String(cardsPob[i + 1][1]), MARGIN + CONTENT_W / 2, y + 4.5, { maxWidth: CONTENT_W / 2 - 6 });
+      y += 6;
+    }
+
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("Vivienda: totales y calidad de la vivienda habitada", MARGIN, y);
+    y += 3;
+
+    const cardsViv = [
+      ["Viviendas totales", fmt(ag.vivienda.viviendasTotales)],
+      ["Viviendas particulares", fmt(ag.vivienda.viviendasParticulares)],
+      ["Viviendas particulares habitadas", fmt(ag.vivienda.viviendasParticularesHabitadas)],
+      ["Viviendas deshabitadas", pct(ag.vivienda.viviendasDeshabitadasPct)],
+      ["Con piso distinto de tierra", pct(ag.vivienda.pctConPisoFirme)],
+      ["Con energía eléctrica", pct(ag.vivienda.pctConElectricidad)],
+      ["Con servicio sanitario", pct(ag.vivienda.pctConSanitario)],
+      ["Con drenaje", pct(ag.vivienda.pctConDrenaje)],
+      ["3+ ocupantes por cuarto **", "ver nota"],
+    ];
+    doc.setFontSize(9.5);
+    for (let i = 0; i < cardsViv.length; i += 2) {
+      y += 8;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(110, 100, 130);
+      doc.text(cardsViv[i][0], MARGIN, y);
+      if (cardsViv[i + 1]) doc.text(cardsViv[i + 1][0], MARGIN + CONTENT_W / 2, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      doc.text(String(cardsViv[i][1]), MARGIN, y + 4.5, { maxWidth: CONTENT_W / 2 - 6 });
+      if (cardsViv[i + 1]) doc.text(String(cardsViv[i + 1][1]), MARGIN + CONTENT_W / 2, y + 4.5, { maxWidth: CONTENT_W / 2 - 6 });
+      y += 6;
+    }
+
+    y += 10;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(110, 100, 130);
+    const notaAmpliada = doc.splitTextToSize(
+      `* ${ag.cortesEdadNota}\n\n** ${ag.vivienda.ocupantes3masPorCuartoNota}`,
+      CONTENT_W);
+    doc.text(notaAmpliada, MARGIN, y);
+    doc.setTextColor(40, 40, 40);
+
+    // ---------------- página 3: contexto inmobiliario ----------------
     doc.addPage();
     pdfHeader(doc, "Zona de influencia — contexto inmobiliario");
     y = 30;

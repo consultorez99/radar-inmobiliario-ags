@@ -46,6 +46,7 @@ function clearZone() {
   currentZone = null;
   currentStats = null;
   window.clearBufferAnalysis?.(false);
+  document.getElementById("btn-png").classList.add("hidden");
   document.getElementById("zone-panel").classList.add("hidden");
 }
 
@@ -186,6 +187,8 @@ function renderZonePanel(s) {
   // mostrar el panel ANTES de crear los charts: con el panel oculto los
   // canvas miden 0x0 y las imágenes para el PDF salen corruptas
   document.getElementById("btn-csv").classList.add("hidden");
+  document.getElementById("btn-json").classList.add("hidden");
+  document.getElementById("btn-png").classList.remove("hidden");
   document.getElementById("zone-panel").classList.remove("hidden");
   renderZoneCharts(s);
 }
