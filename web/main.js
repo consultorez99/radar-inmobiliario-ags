@@ -100,6 +100,9 @@ const fmtMXN = (n) => "$" + Number(n).toLocaleString("es-MX");
 // --------------------------------------------------------------------- mapa
 const map = L.map("map", { zoomControl: false }).setView(AGS_CENTER, AGS_ZOOM);
 L.control.zoom({ position: "topleft" }).addTo(map);
+// solo métrico (km/m) — el sitio no usa unidades imperiales en ningún otro lado.
+// También aparece en el export PNG de la zona de estudio (ver reporte.js).
+L.control.scale({ position: "bottomright", imperial: false }).addTo(map);
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
