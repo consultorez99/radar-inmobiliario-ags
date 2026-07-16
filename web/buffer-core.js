@@ -148,7 +148,7 @@
    *
    * s: el objeto `stats` que devuelve analyzeBuffer() en buffer.js (lat, lng,
    * radiusKm, areaKm2, agebRows, pctSinAgeb, demo, colonias, catStats, pdu,
-   * pduAreaKm2, proyectos, pois, poisDisponibles, crecMunicipios).
+   * pduAreaKm2, proyectos, pois, poisDisponibles, poblacionMunicipios).
    */
   function buildZonaAgregados(s) {
     const d = s.demo;
@@ -242,14 +242,18 @@
 
       poiConteos: s.poisDisponibles ? s.pois : null,
 
-      crecimientoPoblacionMunicipio: s.crecMunicipios,
+      poblacionProyeccionMunicipio: s.poblacionMunicipios,
     };
   }
 
   /* Construye el JSON público del contrato (ver CONTRATO_ZONA_ESTUDIO.md).
    * schema_version sube si cambia la forma del esquema (no en cada tweak de
-   * redondeo/orden). Deriva de buildZonaAgregados: mismos números que el CSV. */
-  const ZONA_ESTUDIO_SCHEMA_VERSION = 1;
+   * redondeo/orden). Deriva de buildZonaAgregados: mismos números que el CSV.
+   *
+   * v2: crecimiento_poblacion_municipio (un solo % 2010→2020) se reemplaza
+   * por poblacion_proyeccion_municipio (serie completa 1990-2040, CONAPO) —
+   * cambio de forma, no aditivo, por eso sube la versión. */
+  const ZONA_ESTUDIO_SCHEMA_VERSION = 2;
 
   function buildZonaEstudioJSON(s, { now } = {}) {
     const a = buildZonaAgregados(s);
@@ -310,10 +314,19 @@
       pdu_usos: a.pduUsos,
       proyectos: a.proyectos,
       poi_conteos: a.poiConteos,
-      crecimiento_poblacion_municipio: a.crecimientoPoblacionMunicipio,
+      poblacion_proyeccion_municipio: a.poblacionProyeccionMunicipio ? {
+        fuente: a.poblacionProyeccionMunicipio.fuente,
+        nota: a.poblacionProyeccionMunicipio.nota,
+        municipios: Object.fromEntries(
+          Object.entries(a.poblacionProyeccionMunicipio.municipios).map(([mun, v]) => [mun, {
+            serie: v.serie,
+            anio_comparacion_fin: v.anioComparacionFin,
+            cambio_2020_fin_pct: v.cambio2020FinPct,
+          }])),
+      } : null,
       fuentes: [
         "INEGI Censo 2020 (AGEB urbana) — demografía, vivienda, NSE",
-        "INEGI Censo 2010 y Censo 2020, Total del municipio — crecimiento poblacional",
+        "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040",
         "Leyes de Ingresos 2026 de Aguascalientes y Jesús María — valor catastral de suelo",
         "PDUCA 2040 ev.2 / PDU Ciudad de Jesús María 2015-2035 / PMDU Jesús María 2017-2040 — uso de suelo",
         "Estudio de mercado de terceros, corte 1T26 — proyectos de vivienda nueva",
@@ -403,10 +416,16 @@
       add(`poi_${cat.toLowerCase()}`, a.poiConteos ? n : null, "puntos", F_POI, "puntos dentro del radio");
     }
 
-    const F_CENSO_2010 = "INEGI Censo 2010 y Censo 2020 (Total del municipio)";
-    const M_CREC = "variación % de población TOTAL del municipio 2010→2020; dato de contexto del municipio completo, no específico del radio";
-    for (const [m, v] of Object.entries(a.crecimientoPoblacionMunicipio)) {
-      add(`crecimiento_poblacional_2010_2020: ${m}`, v, "% (municipio completo)", F_CENSO_2010, M_CREC);
+    const F_CONAPO_POB = "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040";
+    const M_POB = "reconstrucción histórica (1990-2020) y proyección oficial (2021-2040) de CONAPO; dato de contexto del municipio completo, no específico del radio";
+    if (a.poblacionProyeccionMunicipio) {
+      for (const [mun, v] of Object.entries(a.poblacionProyeccionMunicipio.municipios)) {
+        add(`poblacion_proyeccion_cambio_2020_${v.anioComparacionFin}: ${mun}`, v.cambio2020FinPct,
+          "% (municipio completo)", F_CONAPO_POB, M_POB);
+        for (const [anio, pob] of Object.entries(v.serie)) {
+          add(`poblacion_proyeccion: ${mun} ${anio}`, pob, "habitantes (municipio completo)", F_CONAPO_POB, M_POB);
+        }
+      }
     }
 
     // --- campos nuevos (entregable 1): se agregan AL FINAL, antes de la nota ---

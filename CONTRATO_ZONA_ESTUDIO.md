@@ -7,7 +7,16 @@ sin subir `schema_version`**. Este documento es la referencia autoritativa;
 si hay divergencia entre este archivo y el código, el código gana pero es un
 bug a corregir.
 
-## Versión actual: `schema_version: 1`
+## Versión actual: `schema_version: 2`
+
+### Historial
+
+- **v2** — `crecimiento_poblacion_municipio` (un solo % 2010→2020 por
+  municipio) se reemplaza por `poblacion_proyeccion_municipio` (serie
+  completa 1990-2040 de CONAPO, con `fuente`/`nota`/`municipios` anidados).
+  Cambio de forma, no aditivo — por eso sube la versión. Ver sección de
+  esquema más abajo para el detalle completo.
+- **v1** — versión inicial.
 
 ## Cómo se genera
 
@@ -27,7 +36,9 @@ camino para obtener este JSON es:
    - Cargar `web/buffer-core.js` (`require("./web/buffer-core.js")` — usa
      UMD, funciona en Node y en navegador).
    - Descargar `data/ags_agebs.geojson`, `data/ags_catastral.geojson`,
-     `data/ags_pdu.geojson` (públicos, sin autenticación).
+     `data/ags_pdu.geojson` (públicos, sin autenticación) y, para la serie de
+     población, `data/ags_poblacion_proyeccion.json` (municipio completo,
+     ver más abajo).
    - Intersectar un círculo de `radio_km` alrededor de `(lat, lng)` contra
      esas capas con una librería de geometría (el sitio usa
      [turf.js](https://turfjs.org/) 6.5.0 — `turf.circle`, `turf.intersect`,
@@ -39,7 +50,10 @@ camino para obtener este JSON es:
      `web/buffer.js` (ver ese archivo como referencia exacta de la forma que
      debe tener `stats`: `lat, lng, radiusKm, areaKm2, agebRows, pctSinAgeb,
      demo, colonias, catStats, pdu, pduAreaKm2, proyectos, pois,
-     poisDisponibles, crecMunicipios`).
+     poisDisponibles, poblacionMunicipios` — este último se arma con
+     `resolvePoblacionMunicipios()` en `web/main.js`, leyendo
+     `data/ags_poblacion_proyeccion.json` para los municipios que toca el
+     buffer).
    - Este es el mismo código que corre en el navegador — no hay una segunda
      implementación del cálculo que pueda desviarse.
 
@@ -70,7 +84,7 @@ punto/radio ya analizado es prácticamente gratis.
 
 ```jsonc
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generado": "2026-07-14T22:10:00.000Z",   // ISO 8601, momento de generación del archivo
   "punto": { "lat": 21.948893, "lng": -102.296326 },  // 6 decimales
   "radio_km": 3,
@@ -152,15 +166,31 @@ punto/radio ya analizado es prácticamente gratis.
   // la capa de POIs no había cargado al momento de generar el análisis
   "poi_conteos": { "Educación": 30, "Salud": 17, "Abasto": 29, "Bancos": 8, "Parques": 28, "Gasolineras": 21 },
 
-  // % de crecimiento poblacional 2010→2020 — dato de CONTEXTO A NIVEL
-  // MUNICIPIO COMPLETO (no del radio específico), una entrada por cada
-  // municipio que toca el buffer. Fuente: INEGI Censo 2010 y 2020, fila
-  // "Total del municipio" (no solo AGEB urbana).
-  "crecimiento_poblacion_municipio": { "Aguascalientes": 19.1, "Jesús María": 30.5 },
+  // Serie de población 1990-2040 (CONAPO) — dato de CONTEXTO A NIVEL
+  // MUNICIPIO COMPLETO (no del radio específico ni por AGEB), una entrada
+  // por cada municipio que toca el buffer. 1990-2020 es reconstrucción
+  // demográfica histórica; 2021-2040 es proyección oficial de CONAPO.
+  // null si data/ags_poblacion_proyeccion.json no cargó.
+  "poblacion_proyeccion_municipio": {
+    "fuente": "CONAPO — Conciliación demográfica 1950-2019 y Proyecciones de la Población de México y las Entidades Federativas 2020-2070 (corte municipal, grupos grandes de edad)",
+    "nota": "1990-2020: reconstrucción demográfica histórica. 2021-2040: proyección oficial CONAPO. Nivel municipio completo (no por AGEB ni zona).",
+    "municipios": {
+      "Aguascalientes": {
+        "serie": { "1990": 499839, "2000": 660045, "2010": 814163, "2020": 968960, "2030": 1083798, "2040": 1164986 },
+        "anio_comparacion_fin": 2040,
+        "cambio_2020_fin_pct": 20.2
+      },
+      "Jesús María": {
+        "serie": { "1990": 43145, "2000": 66443, "2010": 101839, "2020": 132642, "2030": 149350, "2040": 161381 },
+        "anio_comparacion_fin": 2040,
+        "cambio_2020_fin_pct": 21.7
+      }
+    }
+  },
 
   "fuentes": [
     "INEGI Censo 2020 (AGEB urbana) — demografía, vivienda, NSE",
-    "INEGI Censo 2010 y Censo 2020, Total del municipio — crecimiento poblacional",
+    "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040",
     "Leyes de Ingresos 2026 de Aguascalientes y Jesús María — valor catastral de suelo",
     "PDUCA 2040 ev.2 / PDU Ciudad de Jesús María 2015-2035 / PMDU Jesús María 2017-2040 — uso de suelo",
     "Estudio de mercado de terceros, corte 1T26 — proyectos de vivienda nueva",
@@ -189,6 +219,14 @@ punto/radio ya analizado es prácticamente gratis.
   tendrá esa clave.
 - `catastral.colonias` y `proyectos` son arreglos vacíos (`[]`), no `null`,
   cuando no hay elementos.
+- `poblacion_proyeccion_municipio` es `null` completo (no un objeto con
+  `municipios: {}`) si `data/ags_poblacion_proyeccion.json` no llegó a
+  cargar en el navegador al momento del análisis — no es un caso esperado en
+  producción, pero un consumidor externo debe manejarlo.
+- La capa de mapa "Marginación" (Índice de Marginación Urbana 2020, CONAPO)
+  **no forma parte de este contrato** — es solo una capa visual del mapa
+  (`conapo_im`/`conapo_grado` en `data/ags_agebs.geojson`), no se agrega a
+  los agregados del buffer/zona ni al JSON/CSV.
 
 ## Política de versionado
 

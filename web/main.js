@@ -82,6 +82,27 @@ const DESH_BINS = [
   { min: 0, color: "#fee5d9", label: "< 5%" },
 ];
 
+// Marginación urbana 2020 (CONAPO, índice oficial — NO es el NSE proxy
+// propio). Azul = mejor, rojo = peor; escala distinta a NSE (verde/rojo)
+// a propósito, para no confundir ambas capas de un vistazo.
+const MARG_COLORS = {
+  "Muy bajo": "#2b6a9e",
+  "Bajo": "#6ba3c9",
+  "Medio": "#f2c14e",
+  "Alto": "#e8871e",
+  "Muy alto": "#c1272d",
+  "S/D": "#9ca3af",
+};
+
+const MARG_LABELS = {
+  "Muy bajo": "Muy bajo — mejor",
+  "Bajo": "Bajo",
+  "Medio": "Medio",
+  "Alto": "Alto",
+  "Muy alto": "Muy alto — peor",
+  "S/D": "Sin dato (AGEB muy pequeña, excluida por CONAPO)",
+};
+
 // PDU: color por grupo de zonificación
 const PDU_COLORS = {
   "Habitacional": "#f2c14e",
@@ -111,7 +132,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 // GeoJSON crudos compartidos con zona.js / reporte.js
-const DATA = { agebs: null, zones: null, cat: null, pdu: null };
+const DATA = { agebs: null, zones: null, cat: null, pdu: null, poblacionProyeccion: null };
 
 let nseLayer = null;
 let priceLayer = null;
@@ -120,6 +141,7 @@ let supLayer = null;
 let pduLayer = null;
 let densLayer = null;
 let deshLayer = null;
+let margLayer = null;
 let activeLayerName = "nse";
 
 // ------------------------------------------------------------------- estilos
@@ -127,6 +149,16 @@ function nseStyle(feature) {
   const nivel = feature.properties.nse_nivel || "S/D";
   return {
     fillColor: NSE_COLORS[nivel] || NSE_COLORS["S/D"],
+    fillOpacity: 0.62,
+    color: "#ffffff",
+    weight: 0.7,
+  };
+}
+
+function marginacionStyle(feature) {
+  const grado = feature.properties.conapo_grado || "S/D";
+  return {
+    fillColor: MARG_COLORS[grado] || MARG_COLORS["S/D"],
     fillOpacity: 0.62,
     color: "#ffffff",
     weight: 0.7,
@@ -265,6 +297,20 @@ function deshPopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Censo 2020 (INEGI). Incluye tanto vivienda nueva sin vender/ocupar como vivienda abandonada — el censo no distingue el motivo.</div>`;
 }
 
+function marginacionPopup(p) {
+  const grado = p.conapo_grado || "S/D";
+  const color = MARG_COLORS[grado] || MARG_COLORS["S/D"];
+  return `
+    <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
+    <span class="popup-badge" style="background:${color}">Marginación ${grado}</span>
+    <table class="popup-table" style="margin-top:6px">
+      <tr><td>Índice de marginación (CONAPO)</td><td><strong>${p.conapo_im != null ? p.conapo_im.toFixed(1) : "s/d"}</strong></td></tr>
+      <tr><td>NSE (proxy propio, referencia)</td><td>${p.nse_nivel || "s/d"}</td></tr>
+      <tr><td>Población</td><td>${p.POBTOT != null ? p.POBTOT.toLocaleString("es-MX") : "s/d"}</td></tr>
+    </table>
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Índice de Marginación Urbana 2020, CONAPO — dato oficial (no es el NSE proxy propio de este sitio, aunque correlacionan). AGEBs muy pequeñas quedan sin dato por confidencialidad censal.</div>`;
+}
+
 function pduPlanoTxt(p) {
   if (p.plano === "Z2_MP36") return "MP36 (zona a consolidar)";
   if (p.plano === "Z2_MP37") return "MP37 (zonificación secundaria)";
@@ -297,6 +343,14 @@ async function loadData() {
   const [agebs, zones, cat, pdu] = await Promise.all([agebsResp.json(), zonesResp.json(), catResp.json(), pduResp.json()]);
   Object.assign(DATA, { agebs, zones, cat, pdu });
   buildColoniaIndex(cat);
+
+  // Serie de población por municipio (CONAPO, 1990-2040) — dato de contexto
+  // para el panel de Zona/Buffer, no crítico: si falla, el resto del mapa
+  // sigue funcionando sin la gráfica de tendencia.
+  try {
+    const proyResp = await fetch("../data/ags_poblacion_proyeccion.json");
+    if (proyResp.ok) DATA.poblacionProyeccion = await proyResp.json();
+  } catch (err) { console.warn("No se pudo cargar la proyección de población:", err); }
 
   // Helper: cuando bufferPicking está activo, el click en cualquier polígono
   // se redirige al análisis de radio en lugar de abrir el popup.
@@ -379,6 +433,16 @@ async function loadData() {
     },
   });
 
+  margLayer = L.geoJSON(agebs, {
+    style: marginacionStyle,
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(marginacionPopup(f.properties), { maxWidth: 300 });
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#1c2a3a" }); });
+      layer.on("mouseout",  () => margLayer.resetStyle(layer));
+    },
+  });
+
   nseLayer.addTo(map);
   map.fitBounds(nseLayer.getBounds(), { padding: [20, 20] });
   buildLegends();
@@ -425,6 +489,9 @@ function buildLegends() {
     .join("");
   document.getElementById("legend-dens-rows").innerHTML = DENS_BINS.map(binRow).join("");
   document.getElementById("legend-desh-rows").innerHTML = DESH_BINS.map(binRow).join("");
+  document.getElementById("legend-marg-rows").innerHTML = Object.entries(MARG_LABELS)
+    .map(([g, label]) => binRow({ color: MARG_COLORS[g], label }))
+    .join("");
 }
 
 // ------------------------------------------------------------ cambio de capa
@@ -436,6 +503,7 @@ const LAYERS = {
   pdu: () => pduLayer,
   dens: () => densLayer,
   desh: () => deshLayer,
+  marg: () => margLayer,
 };
 
 function setLayer(name) {
@@ -453,7 +521,7 @@ function setLayer(name) {
   }
 }
 
-for (const key of ["nse", "price", "cat", "sup", "pdu", "dens", "desh"]) {
+for (const key of ["nse", "price", "cat", "sup", "pdu", "dens", "desh", "marg"]) {
   document.getElementById(`btn-${key}`).addEventListener("click", () => setLayer(key));
 }
 document.getElementById("btn-home").addEventListener("click", () => {
@@ -585,6 +653,73 @@ searchInput.addEventListener("keydown", (e) => {
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".search-box")) searchResults.classList.add("hidden");
 });
+
+// --------------------------------------------- proyección de población (CONAPO)
+// Compartida por zona.js (polígono) y buffer.js (radio): resuelve la serie
+// 1990-2040 de los municipios tocados por la zona/buffer. Dato de contexto a
+// nivel MUNICIPIO COMPLETO (no varía por AGEB/zona) — reemplaza al viejo
+// cálculo de 2 puntos (2010→2020) con la serie oficial completa.
+function resolvePoblacionMunicipios(municipiosTocados) {
+  const proy = DATA.poblacionProyeccion;
+  if (!proy) return null;
+  const municipios = {};
+  for (const mun of municipiosTocados) {
+    const serie = proy.municipios[mun];
+    if (!serie) continue;
+    const anios = Object.keys(serie).map(Number).sort((a, b) => a - b);
+    const anioFin = anios[anios.length - 1];
+    const pop2020 = serie["2020"];
+    const popFin = serie[String(anioFin)];
+    municipios[mun] = {
+      serie,
+      anioComparacionFin: anioFin,
+      cambio2020FinPct: (pop2020 > 0 && popFin != null)
+        ? Number((((popFin - pop2020) / pop2020) * 100).toFixed(1))
+        : null,
+    };
+  }
+  if (!Object.keys(municipios).length) return null;
+  return { fuente: proy.fuente, nota: proy.nota, municipios };
+}
+
+// Gráfica de línea con la serie de población 1990-2040 por municipio (CONAPO).
+// Compartida por zona.js y buffer.js — mismo canvas id "chart-pob" en ambos
+// paneles. El tramo 2021-2040 es proyección oficial, no dato observado; se
+// aclara en el título de la gráfica y en las notas metodológicas del panel/PDF.
+const POB_CHART_COLORS = ["#2f6690", "#2a9d8f", "#e8871e", "#c1272d"];
+
+function renderPoblacionChart(canvasId, poblacionMunicipios) {
+  if (!poblacionMunicipios) return null;
+  const entries = Object.entries(poblacionMunicipios.municipios);
+  if (!entries.length) return null;
+  const anios = Object.keys(entries[0][1].serie).map(Number).sort((a, b) => a - b);
+
+  return new Chart(document.getElementById(canvasId), {
+    type: "line",
+    data: {
+      labels: anios,
+      datasets: entries.map(([mun, v], i) => ({
+        label: mun,
+        data: anios.map((a) => v.serie[String(a)] ?? null),
+        borderColor: POB_CHART_COLORS[i % POB_CHART_COLORS.length],
+        backgroundColor: "transparent",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.15,
+      })),
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        title: { display: true, text: "Población municipal 1990–2040 (CONAPO; 2021+ es proyección)", font: { size: 10.5 } },
+        legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 9 } } },
+      },
+      scales: {
+        y: { ticks: { callback: (v) => Number(v).toLocaleString("es-MX") } },
+      },
+    },
+  });
+}
 
 // ------------------------------------------------------------- modal Acerca
 const aboutModal = document.getElementById("about-modal");

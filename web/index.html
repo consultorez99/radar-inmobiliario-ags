@@ -49,6 +49,7 @@
       <div id="zone-stats"></div>
       <div class="zone-chart"><canvas id="chart-nse"></canvas></div>
       <div class="zone-chart"><canvas id="chart-cat"></canvas></div>
+      <div class="zone-chart"><canvas id="chart-pob"></canvas></div>
       <button class="zone-report-btn" id="btn-report">
         <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><path d="M5.5 2.5h6l3 3v12h-9z"/><path d="M11.5 2.5v3h3"/><line x1="7.3" y1="10.5" x2="12.7" y2="10.5"/><line x1="7.3" y1="13.3" x2="12.7" y2="13.3"/></svg>
         Generar reporte PDF
@@ -120,6 +121,13 @@
           <rect x="7.5" y="10.8" width="5" height="5" stroke-dasharray="1.4 1.4"/>
         </svg></span>
         <span class="layer-label">Vacantes</span>
+      </button>
+      <button class="layer-btn" id="btn-marg" data-layer="marg" title="Índice de Marginación Urbana 2020 (CONAPO, oficial) por AGEB">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20">
+          <circle cx="10" cy="8" r="5"/>
+          <path d="M7 12.5 5.5 17.5 10 15.5 14.5 17.5 13 12.5"/>
+        </svg></span>
+        <span class="layer-label">Marginación</span>
       </button>
       <div class="panel-sep"></div>
       <button class="layer-btn" id="btn-buffer" title="Análisis de zona de influencia: elige un punto (clic en el mapa o coordenadas) y un radio de 1 a 5 km">
@@ -212,6 +220,19 @@
         <div class="legend-note">% de viviendas particulares deshabitadas por AGEB (Censo 2020,
           INEGI). El censo no distingue el motivo: puede ser vivienda nueva aún sin vender/ocupar
           o vivienda abandonada.</div>
+      </div>
+    </div>
+    <div class="legend hidden" id="legend-marg">
+      <div class="legend-title legend-drag-handle">
+        Marginación urbana (CONAPO)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-marg-rows"></div>
+        <div class="legend-note">Índice de Marginación Urbana 2020, CONAPO — dato <strong>oficial</strong>
+          (a diferencia del NSE, que es un proxy propio de este sitio). Correlaciona con el NSE pero
+          no es lo mismo: usa otras variables y otra metodología. AGEBs muy pequeñas quedan sin dato
+          por confidencialidad censal.</div>
       </div>
     </div>
     <div class="legend hidden" id="legend-proyectos">
@@ -324,6 +345,14 @@
         distingue el motivo de la vacancia: puede ser vivienda nueva aún sin vender u ocupar, o
         vivienda abandonada — útil como señal de posible sobreoferta o zona en declive, pero
         requiere verificación en campo antes de interpretarse como una u otra.</p>
+      <h3>Marginación urbana (capa "Marginación")</h3>
+      <p>Índice y grado de Marginación Urbana 2020 del <em>Consejo Nacional de Población
+        (CONAPO)</em> por AGEB — a diferencia del NSE de este sitio, <strong>es un índice oficial
+        de gobierno</strong>, no un proxy propio. Usa variables distintas (educación, salud,
+        vivienda) con una metodología también distinta a la de este sitio; correlaciona con el NSE
+        (r≈0.84 en pruebas internas) pero no son intercambiables — hay AGEBs donde divergen. Como
+        con el NSE, las AGEBs muy pequeñas (menos de ~60 habitantes) quedan sin dato porque CONAPO
+        las excluye del cálculo por baja confiabilidad estadística.</p>
       <h3>Vivienda nueva (panel "Vivienda nueva")</h3>
       <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
         producto, tomados de un estudio de mercado de terceros (corte 1T26).
@@ -348,6 +377,8 @@
         <li>SEGUOT — Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 y
           Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040, visores ArcGIS Online.</li>
         <li>OpenStreetMap contributors — Puntos de interés (ODbL), vía Overpass API.</li>
+        <li>CONAPO — Índice de Marginación Urbana 2020, y Proyecciones de Población de los
+          Municipios de México 1990-2040 (Conciliación demográfica y proyecciones oficiales).</li>
         <li>Estudio de mercado de terceros — corte 1T26 (fuente privada, adquirida por el despacho).</li>
         <li>Mapa base © OpenStreetMap contributors · Geocoding: Nominatim.</li>
       </ul>
@@ -370,7 +401,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=5"></script>
+  <script src="main.js?v=6"></script>
   <script src="zona.js?v=5"></script>
   <script src="reporte.js?v=5"></script>
   <script src="softec.js?v=2"></script>

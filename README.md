@@ -70,8 +70,10 @@ python3 -m http.server 8000
 ```
 data/
   ags_agebs.geojson          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona,
-                             # variables censales, pct_deshabitadas, densidad_hab_km2 y crec_mun_2010_2020
+                             # variables censales, pct_deshabitadas, densidad_hab_km2 y
+                             # conapo_im/conapo_grado/conapo_imn (marginación urbana, CONAPO)
   ags_price_zones.geojson    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
+  ags_poblacion_proyeccion.json  # población por municipio 1990-2040 (CONAPO, histórico + proyección)
   ags_catastral.geojson      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
   ags_pdu.geojson            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
   ags_poi.geojson            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
@@ -138,6 +140,8 @@ límite municipal Aguascalientes/Jesús María y el % de cobertura sin AGEB.
 | Zonificación PDU ciudad Jesús María | Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 — webmap ArcGIS Online del [visor público](https://www.arcgis.com/apps/View/index.html?appid=38199e163ac24c5d9cef8b65f1a7b406) (item `87779e642ad54f1cbceab3fdc1cfc281`, dueño `VISORWEBSEGUOT`) | `data/raw/pduca_jm_webmap.json` |
 | Zonificación PDU municipal Jesús María | Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040 (item `d536f0cad8aa441bb8e255338e2ea717`, mismo dueño). Cubre todo el municipio; se recorta contra el plan de la ciudad para no traslapar. | `data/raw/pdu_jm_municipal_webmap.json` |
 | Recámaras / cuartos | Censo 2020 (mismo ITER de arriba): `VPH_2YMASD`, `VPH_3YMASC` | mismo CSV |
+| Marginación urbana | CONAPO, Índice de Marginación Urbana 2020 | `data/raw/conapo/IMU_2020.xls` |
+| Proyección de población | CONAPO, Proyecciones de Población de los Municipios de México 1990-2040 | `data/raw/conapo/pobproy_ggrupos.csv` |
 | Puntos de interés | OpenStreetMap contributors, vía [Overpass API](https://overpass-api.de/api/interpreter) (dato abierto ODbL) | generado por `scripts/build_poi.py`, no se guarda insumo crudo |
 
 URLs de descarga directa usadas:
@@ -203,11 +207,10 @@ INEGI (`*`, `N/D`) se imputan al punto medio (0.5) de la variable normalizada.
 hogar, no agregados por AGEB); los cortes por percentil fuerzan una
 distribución relativa *dentro del municipio*; los datos censales son de 2020.
 
-## Densidad, viviendas deshabitadas y crecimiento poblacional
+## Densidad y viviendas deshabitadas
 
-Tres campos adicionales por AGEB en `ags_agebs.geojson`, calculados en
-`build_nse.py` a partir del mismo Censo 2020 (y, para crecimiento, el
-Censo 2010) ya usado para el NSE:
+Dos campos adicionales por AGEB en `ags_agebs.geojson`, calculados en
+`build_nse.py` a partir del mismo Censo 2020 ya usado para el NSE:
 
 - **`densidad_hab_km2`** — `POBTOT` entre el área del polígono AGEB
   (proyectada a EPSG:6372 para medir en metros). Capa "Densidad".
@@ -216,18 +219,35 @@ Censo 2010) ya usado para el NSE:
   Correlaciona ~0 con NSE y con el proxy de tamaño de vivienda — señal
   independiente, útil como indicador de posible sobreoferta (vivienda nueva
   sin vender) o abandono; el censo no distingue el motivo.
-- **`crec_mun_2010_2020`** — variación % de población TOTAL del municipio
-  (no solo AGEB urbana) entre el Censo 2010 y el Censo 2020. Es un dato de
-  **contexto a nivel municipio** (solo 2 valores posibles: Aguascalientes o
-  Jesús María), no varía por zona — por eso no tiene capa propia en el mapa;
-  se muestra como línea de contexto en los paneles de Zona de estudio y
-  Zona de influencia, y en sus reportes PDF/CSV.
 
-  **Ojo con la fuente de la población 2020 para este cálculo**: no debe
-  sumarse `POBTOT` de las AGEBs urbanas (excluye localidades rurales), sino
-  leerse directo la fila `NOM_LOC == "Total del municipio"` del mismo
-  `ITER_CSV` — de lo contrario Jesús María, con población rural real fuera
-  de la mancha urbana, sale con una caída poblacional falsa.
+## Marginación urbana (CONAPO)
+
+`conapo_im` (índice), `conapo_grado` (Muy bajo…Muy alto) y `conapo_imn`
+(índice normalizado) por AGEB, capa "Marginación". Fuente: Índice de
+Marginación Urbana 2020 de CONAPO (`data/raw/conapo/IMU_2020.xls`), cruzado
+por CVEGEO — el campo `CVE_AGEB` de ese archivo es, pese al nombre, el
+CVEGEO completo de 13 dígitos. Cruce exacto en 363 de 373 AGEBs; las 10
+restantes (todas con <60 habitantes) quedan sin dato porque CONAPO las
+excluye del cálculo por baja confiabilidad estadística.
+
+A diferencia del NSE (proxy propio de este sitio), este **es un índice
+oficial de gobierno** — correlaciona con el NSE (r≈0.84) pero no es
+redundante: hay AGEBs donde ambos índices divergen.
+
+## Proyección de población (CONAPO, 1990-2040)
+
+`data/ags_poblacion_proyeccion.json` — serie de población TOTAL por
+municipio, generada por `build_poblacion_proyeccion()` en `build_nse.py` a
+partir de `data/raw/conapo/pobproy_ggrupos.csv` (Proyecciones de Población
+de los Municipios de México, CONAPO). 1990-2020 es reconstrucción
+demográfica histórica; 2021-2040 es proyección oficial. Reemplaza al viejo
+`crec_mun_2010_2020` (un solo % entre dos años) con la serie completa.
+
+Es un dato de **contexto a nivel municipio** (no varía por zona/AGEB) — no
+tiene capa propia en el mapa; se muestra como gráfica de línea
+(`resolvePoblacionMunicipios()` en `web/main.js`) en los paneles de Zona de
+estudio y Zona de influencia, y en sus reportes PDF/CSV/JSON. Ver
+`CONTRATO_ZONA_ESTUDIO.md` para el esquema exacto del JSON (`schema_version: 2`).
 
 ## Zonas de precio ($/m²)
 
@@ -256,9 +276,12 @@ retoma más adelante**.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install geopandas pandas
+.venv/bin/pip install geopandas pandas xlrd
 # descargar y descomprimir los dos zips de INEGI en data/raw/ (ver URLs arriba):
 #   data/raw/mg/conjunto_de_datos/01a.shp   y   data/raw/iter/...csv
+# descargar de CONAPO en data/raw/conapo/:
+#   IMU_2020.xls  (https://conapo.segob.gob.mx/work/models/CONAPO/Datos_Abiertos/Marginacion/IMU_2020.zip)
+#   pobproy_ggrupos.csv  (datos.gob.mx, dataset "proyecciones-de-poblacion")
 .venv/bin/python scripts/build_nse.py
 ```
 
