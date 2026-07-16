@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera data/ags_poi.geojson: puntos de interés (escuelas, salud, abasto,
+Genera data/ags_poi.json: puntos de interés (escuelas, salud, abasto,
 bancos, parques, gasolineras) de OpenStreetMap vía Overpass API, para el
 área de Aguascalientes + Jesús María + San Francisco de los Romo.
 
@@ -15,7 +15,7 @@ import os
 import urllib.request
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(BASE, "data/ags_poi.geojson")
+OUT = os.path.join(BASE, "data/ags_poi.json")
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 UA = "radar-inmobiliario-ags/1.0 (uso interno, capa POI)"

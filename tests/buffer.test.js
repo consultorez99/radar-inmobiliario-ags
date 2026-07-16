@@ -3,7 +3,7 @@
  * Corre con `npm test` (node --test). @turf/turf es devDependency SOLO para
  * estos tests: es la misma versión 6.5.0 que el navegador carga del CDN, y
  * permite probar en Node la misma geometría (intersección buffer × AGEB)
- * contra los datos reales de data/ags_agebs.geojson.
+ * contra los datos reales de data/ags_agebs.json.
  */
 
 "use strict";
@@ -22,7 +22,7 @@ const LISBOA = { lat: 21.948892601256567, lng: -102.29632586250825, radiusKm: 3 
  * turf, fracción de área). Reutilizado por varios tests. */
 function buildLisboaAgebRows() {
   const agebs = JSON.parse(fs.readFileSync(
-    path.join(__dirname, "..", "data", "ags_agebs.geojson"), "utf8"));
+    path.join(__dirname, "..", "data", "ags_agebs.json"), "utf8"));
   const circle = turf.circle([LISBOA.lng, LISBOA.lat], LISBOA.radiusKm, { steps: 96, units: "kilometers" });
   const bufferAreaKm2 = turf.area(circle) / 1e6;
 
@@ -177,7 +177,7 @@ test("interpolación areal: variables nuevas nulas no envenenan el agregado (AGE
       pct_piso_firme: 95, nse_nivel: "C",
     }},
     // AGEB pequeña con edad/discapacidad suprimidas por INEGI (como las 6
-    // reales que aparecen en data/ags_agebs.geojson) — no debe romper ni
+    // reales que aparecen en data/ags_agebs.json) — no debe romper ni
     // restar de más al agregado
     { frac: 1.0, props: {
       POBTOT: 19, POBFEM: 10, POBMAS: 9,

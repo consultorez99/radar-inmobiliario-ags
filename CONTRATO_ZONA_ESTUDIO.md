@@ -35,8 +35,8 @@ camino para obtener este JSON es:
    Node.js puede:
    - Cargar `web/buffer-core.js` (`require("./web/buffer-core.js")` — usa
      UMD, funciona en Node y en navegador).
-   - Descargar `data/ags_agebs.geojson`, `data/ags_catastral.geojson`,
-     `data/ags_pdu.geojson` (públicos, sin autenticación) y, para la serie de
+   - Descargar `data/ags_agebs.json`, `data/ags_catastral.json`,
+     `data/ags_pdu.json` (públicos, sin autenticación) y, para la serie de
      población, `data/ags_poblacion_proyeccion.json` (municipio completo,
      ver más abajo).
    - Intersectar un círculo de `radio_km` alrededor de `(lat, lng)` contra
@@ -225,7 +225,7 @@ punto/radio ya analizado es prácticamente gratis.
   producción, pero un consumidor externo debe manejarlo.
 - La capa de mapa "Marginación" (Índice de Marginación Urbana 2020, CONAPO)
   **no forma parte de este contrato** — es solo una capa visual del mapa
-  (`conapo_im`/`conapo_grado` en `data/ags_agebs.geojson`), no se agrega a
+  (`conapo_im`/`conapo_grado` en `data/ags_agebs.json`), no se agrega a
   los agregados del buffer/zona ni al JSON/CSV.
 
 ## Política de versionado

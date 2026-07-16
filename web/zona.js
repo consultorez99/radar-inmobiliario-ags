@@ -51,6 +51,13 @@ function clearZone() {
 }
 
 function setZone(polygon) {
+  if (!DATA.pdu) {
+    // el PDU se descarga bajo demanda: pedirlo y reintentar con el mismo polígono
+    window.ensurePdu()
+      .then(() => setZone(polygon))
+      .catch((err) => alert(err.message));
+    return;
+  }
   // el panel muestra un análisis a la vez: quitar el buffer si lo hay
   window.clearBufferAnalysis?.(false);
   currentZone = polygon;

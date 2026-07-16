@@ -198,8 +198,15 @@ function onBufferCenterDragEnd(e) {
 
 // --------------------------------------------------------------- ejecución
 function runBufferAnalysis(lat, lng, radiusKm, { fit = true } = {}) {
-  if (!DATA.agebs || !DATA.cat || !DATA.pdu) {
+  if (!DATA.agebs || !DATA.cat) {
     alert("Los datos del mapa aún se están cargando. Intenta en unos segundos.");
+    return;
+  }
+  if (!DATA.pdu) {
+    // el PDU se descarga bajo demanda: pedirlo y reintentar el análisis al llegar
+    window.ensurePdu()
+      .then(() => runBufferAnalysis(lat, lng, radiusKm, { fit }))
+      .catch((err) => alert(err.message));
     return;
   }
   stopBufferPicking();

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera data/ags_catastral.geojson: polígonos de colonias (INEGI DCAH) con el
+Genera data/ags_catastral.json: polígonos de colonias (INEGI DCAH) con el
 valor unitario de suelo ($/m²) de las Tablas de Valores Unitarios anexas a la
 Ley de Ingresos del Municipio de Aguascalientes 2026 (Decreto 377, Periódico
 Oficial del Estado, 26-dic-2025).
@@ -29,7 +29,7 @@ import geopandas as gpd
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PDF = os.path.join(BASE, "data/raw/ley_ingresos_ags_2026.pdf")
 DCAH_SHP = os.path.join(BASE, "data/raw/dcah/conjunto_de_datos/01as.shp")
-OUT = os.path.join(BASE, "data/ags_catastral.geojson")
+OUT = os.path.join(BASE, "data/ags_catastral.json")
 OUT_CSV = os.path.join(BASE, "data/raw/valores_catastrales_2026.csv")
 UNMATCHED_CSV = os.path.join(BASE, "data/raw/valores_sin_match.csv")
 
