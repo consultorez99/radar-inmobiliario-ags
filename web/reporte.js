@@ -187,17 +187,18 @@ async function generarReportePDF() {
       y += 10;
     }
 
-    // crecimiento poblacional 2010-2020 (dato de contexto del municipio completo)
-    const crecEntries = Object.entries(s.crecMunicipios);
-    if (crecEntries.length) {
+    // proyección de población CONAPO 1990-2040 (dato de contexto del municipio completo)
+    if (s.poblacionMunicipios) {
       y += 9;
       doc.setFont("helvetica", "normal");
       doc.setTextColor(110, 100, 130);
-      doc.text("Crecimiento poblacional 2010–2020 (municipio completo, no la zona)", MARGIN, y);
+      doc.text("Proyección de población CONAPO (municipio completo, no la zona)", MARGIN, y);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 40, 40);
-      const crecTxt = crecEntries.map(([m, v]) => `${m} ${v >= 0 ? "+" : ""}${v}%`).join(" · ");
-      doc.text(crecTxt, MARGIN, y + 4.5, { maxWidth: CONTENT_W });
+      const pobTxt = Object.entries(s.poblacionMunicipios.municipios)
+        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+        .join(" · ");
+      doc.text(pobTxt, MARGIN, y + 4.5, { maxWidth: CONTENT_W });
       y += 10;
     }
 
@@ -216,6 +217,11 @@ async function generarReportePDF() {
       doc.addImage(zoneCharts.cat.toBase64Image(), "PNG", MARGIN + half + 6, y, half, half * 0.62, undefined, "FAST");
     }
     y += half * 0.62 + 10;
+
+    if (zoneCharts.pob) {
+      doc.addImage(zoneCharts.pob.toBase64Image(), "PNG", MARGIN, y, CONTENT_W, CONTENT_W * 0.35, undefined, "FAST");
+      y += CONTENT_W * 0.35 + 10;
+    }
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -445,6 +451,10 @@ async function generarReporteBufferPDF() {
       if (zoneCharts.cat) doc.addImage(zoneCharts.cat.toBase64Image(), "PNG", MARGIN + half + 6, y, half, half * 0.62, undefined, "FAST");
       y += half * 0.62 + 10;
     }
+    if (zoneCharts.pob) {
+      doc.addImage(zoneCharts.pob.toBase64Image(), "PNG", MARGIN, y, CONTENT_W, CONTENT_W * 0.35, undefined, "FAST");
+      y += CONTENT_W * 0.35 + 10;
+    }
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -544,14 +554,15 @@ async function generarReporteBufferPDF() {
     need(14);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("Crecimiento poblacional 2010–2020", MARGIN, y);
+    doc.text("Proyección de población (CONAPO, 1990–2040)", MARGIN, y);
     y += 5;
     doc.setFont("helvetica", "normal");
-    const crecEntriesBuf = Object.entries(s.crecMunicipios);
     parrafo(
-      crecEntriesBuf.length
-        ? crecEntriesBuf.map(([m, v]) => `${m}: ${v >= 0 ? "+" : ""}${v}%`).join("   ·   ") +
-          "  (dato del municipio completo, no específico del radio)"
+      s.poblacionMunicipios
+        ? Object.entries(s.poblacionMunicipios.municipios)
+            .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+            .join("   ·   ") +
+          "  (dato del municipio completo, no específico del radio — ver gráfica)"
         : "s/d",
       MARGIN + 2, 9, 1.5);
     y += 6;
@@ -568,7 +579,7 @@ async function generarReporteBufferPDF() {
       "NSE: proxy propio calculado con variables del Censo 2020 (INEGI). NO es la metodología oficial de AMAI y puede diferir del NSE real.",
       `Cobertura: el ${pct(s.pctSinAgeb, 0)} del área del radio no tiene AGEB urbana 2020 (fraccionamientos posteriores al censo o zona rural); en esa superficie no hay dato demográfico y los agregados subestiman la zona.`,
       "Valores catastrales: oficiales (Leyes de Ingresos 2026), pero el cruce nombre-polígono es automático y el valor catastral suele ser menor al precio de mercado. Verificar en la ley antes de un trámite.",
-      "Crecimiento poblacional 2010-2020: variación de población TOTAL del municipio completo (INEGI, censos 2010 y 2020), no del radio específico — se muestra como contexto, no como parte de la interpolación areal.",
+      "Proyección de población: serie de CONAPO (1990-2020 reconstrucción histórica, 2021-2040 proyección oficial) de la población TOTAL del municipio completo, no del radio específico — se muestra como contexto, no como parte de la interpolación areal.",
       "Estimaciones con datos abiertos y un estudio de mercado de terceros (1T26). Este reporte NO es un avalúo.",
     ];
     for (const a of avisos) parrafo("· " + a, MARGIN, 8, 1.6);

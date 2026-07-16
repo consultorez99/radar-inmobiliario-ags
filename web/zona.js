@@ -7,7 +7,7 @@
 "use strict";
 
 const drawnItems = new L.FeatureGroup().addTo(map);
-let zoneCharts = { nse: null, cat: null };
+let zoneCharts = { nse: null, cat: null, pob: null };
 let currentZone = null;   // Feature<Polygon> dibujado
 let currentStats = null;  // resultado de analyzeZone
 
@@ -123,21 +123,17 @@ function analyzeZone(polygon) {
     } catch (err) { /* omitir intersección fallida */ }
   }
 
-  // Crecimiento poblacional 2010-2020: dato de contexto a nivel MUNICIPIO
-  // (no varía dentro del municipio), una vez por cada municipio que toca la zona
-  const crecMunicipios = {};
-  for (const p of agebs) {
-    if (p.crec_mun_2010_2020 != null && !(p.municipio in crecMunicipios)) {
-      crecMunicipios[p.municipio] = p.crec_mun_2010_2020;
-    }
-  }
+  // Proyección de población (CONAPO 1990-2040): dato de contexto a nivel
+  // MUNICIPIO completo (no varía dentro del municipio), para los municipios
+  // que toca la zona.
+  const poblacionMunicipios = resolvePoblacionMunicipios([...new Set(agebs.map((p) => p.municipio))]);
 
   return {
     areaKm2, nAgebs: agebs.length, pop, nivelPred,
     nseScore: scoreW ? scoreSum / scoreW : null,
     nseCounts, pct2dorm: nPct ? d2 / nPct : null, pct3cuart: nPct ? c3 / nPct : null,
     cols: cols.sort((a, b) => b.valor_m2 - a.valor_m2), catStats,
-    priceZones, pduShares, crecMunicipios,
+    priceZones, pduShares, poblacionMunicipios,
   };
 }
 
@@ -156,9 +152,10 @@ function renderZonePanel(s) {
         .map(([g, km]) => `${g}: ${Math.round(km / pduTotal * 100)}%`).join(" · ")
     : "Sin cobertura del PDU";
 
-  const crecEntries = Object.entries(s.crecMunicipios);
-  const crecTxt = crecEntries.length
-    ? crecEntries.map(([m, v]) => `${m} ${v >= 0 ? "+" : ""}${v}%`).join(" · ")
+  const pobTxt = s.poblacionMunicipios
+    ? Object.entries(s.poblacionMunicipios.municipios)
+        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+        .join(" · ")
     : "s/d";
 
   el.innerHTML = `
@@ -181,8 +178,8 @@ function renderZonePanel(s) {
     </div>
     <div class="zone-list"><strong>Mercado:</strong><br>${priceTxt}</div>
     <div class="zone-list"><strong>Uso de suelo (PDU):</strong> ${pduTxt}</div>
-    <div class="zone-list"><strong>Crecimiento poblacional 2010–2020</strong> (dato del municipio
-      completo, no de la zona): ${crecTxt}</div>`;
+    <div class="zone-list"><strong>Proyección de población (CONAPO)</strong> — dato del municipio
+      completo, no de la zona: ${pobTxt}</div>`;
 
   // mostrar el panel ANTES de crear los charts: con el panel oculto los
   // canvas miden 0x0 y las imágenes para el PDF salen corruptas
@@ -246,6 +243,8 @@ function renderZoneCharts(s) {
       },
     });
   }
+
+  zoneCharts.pob = renderPoblacionChart("chart-pob", s.poblacionMunicipios);
 }
 
 // ---------------------------------------------------------------- comparador

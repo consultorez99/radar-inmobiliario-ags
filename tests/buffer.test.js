@@ -50,16 +50,28 @@ function buildLisboaAgebRows() {
 function buildLisboaStats() {
   const { agebRows, bufferAreaKm2, pctSinAgeb } = buildLisboaAgebRows();
   const demo = BufferCore.aggregateDemographics(agebRows);
-  const crecMunicipios = {};
-  for (const r of agebRows) {
-    const m = r.props.municipio;
-    if (r.props.crec_mun_2010_2020 != null && !(m in crecMunicipios)) {
-      crecMunicipios[m] = r.props.crec_mun_2010_2020;
-    }
-  }
+  // Proyección de población CONAPO 1990-2040 — fixture sintético con la
+  // misma forma que resolvePoblacionMunicipios() en web/main.js, con
+  // valores reales tomados de data/ags_poblacion_proyeccion.json.
+  const poblacionMunicipios = {
+    fuente: "CONAPO — Conciliación demográfica 1950-2019 y Proyecciones de la Población de México y las Entidades Federativas 2020-2070 (corte municipal, grupos grandes de edad)",
+    nota: "1990-2020: reconstrucción demográfica histórica. 2021-2040: proyección oficial CONAPO. Nivel municipio completo (no por AGEB ni zona).",
+    municipios: {
+      Aguascalientes: {
+        serie: { "1990": 499839, "2000": 660045, "2010": 814163, "2020": 968960, "2030": 1083798, "2040": 1164986 },
+        anioComparacionFin: 2040,
+        cambio2020FinPct: 20.2,
+      },
+      "Jesús María": {
+        serie: { "1990": 43145, "2000": 66443, "2010": 101839, "2020": 132642, "2030": 149350, "2040": 161381 },
+        anioComparacionFin: 2040,
+        cambio2020FinPct: 21.7,
+      },
+    },
+  };
   return {
     lat: LISBOA.lat, lng: LISBOA.lng, radiusKm: LISBOA.radiusKm,
-    areaKm2: bufferAreaKm2, agebRows, pctSinAgeb, demo, crecMunicipios,
+    areaKm2: bufferAreaKm2, agebRows, pctSinAgeb, demo, poblacionMunicipios,
     colonias: [
       { TIPO: "FRACCIONAMIENTO", NOM_ASEN: "PASEOS DE AGUASCALIENTES", municipio: "Aguascalientes", CP: "20916", valor_m2: 5200 },
       { TIPO: "FRACCIONAMIENTO", NOM_ASEN: "VIÑEDOS", municipio: "Jesús María", CP: "20915", valor_m2: 4100 },
@@ -240,19 +252,28 @@ test("catastral: min/mediana/max con n impar y par", () => {
 });
 
 // -------------------------------------------------- 5. esquema JSON estable
-test("JSON del contrato: forma estable (schema_version=1, claves de cada sección)", () => {
+test("JSON del contrato: forma estable (schema_version=2, claves de cada sección)", () => {
   const stats = buildLisboaStats();
   const j = BufferCore.buildZonaEstudioJSON(stats, { now: new Date("2026-07-14T12:00:00Z") });
 
   assert.equal(j.schema_version, BufferCore.ZONA_ESTUDIO_SCHEMA_VERSION);
-  assert.equal(j.schema_version, 1, "si esto falla intencionalmente, hay que subir ZONA_ESTUDIO_SCHEMA_VERSION y documentarlo en CONTRATO_ZONA_ESTUDIO.md");
+  assert.equal(j.schema_version, 2, "si esto falla intencionalmente, hay que subir ZONA_ESTUDIO_SCHEMA_VERSION y documentarlo en CONTRATO_ZONA_ESTUDIO.md");
 
   assert.deepEqual(Object.keys(j).sort(), [
     "advertencias", "agebs_intersectadas", "area_buffer_km2", "catastral",
-    "cobertura_ageb_pct", "cortes_edad_nota", "crecimiento_poblacion_municipio",
+    "cobertura_ageb_pct", "cortes_edad_nota", "poblacion_proyeccion_municipio",
     "demografia", "fuentes", "generado", "nse_distribucion", "pdu_usos",
     "poi_conteos", "proyectos", "punto", "radio_km", "schema_version", "vivienda",
   ].sort());
+
+  assert.deepEqual(Object.keys(j.poblacion_proyeccion_municipio).sort(),
+    ["fuente", "municipios", "nota"].sort());
+  for (const [mun, v] of Object.entries(j.poblacion_proyeccion_municipio.municipios)) {
+    assert.deepEqual(Object.keys(v).sort(), ["anio_comparacion_fin", "cambio_2020_fin_pct", "serie"].sort(),
+      `forma inesperada para ${mun}`);
+    assert.equal(typeof v.serie, "object");
+    assert.equal(typeof v.cambio_2020_fin_pct, "number");
+  }
 
   assert.deepEqual(Object.keys(j.punto).sort(), ["lat", "lng"]);
 
@@ -365,9 +386,14 @@ test("paridad CSV↔JSON: mismos números, mismos redondeos (caso Lisboa Residen
     parEq(`nse_${nivel}_pct_poblacion`, j.nse_distribucion[nivel], `NSE ${nivel}`);
   }
 
-  // crecimiento poblacional por municipio
-  for (const [m, v] of Object.entries(j.crecimiento_poblacion_municipio)) {
-    assert.equal(csvByName[`crecimiento_poblacional_2010_2020: ${m}`], v, `crecimiento ${m}`);
+  // proyección de población por municipio: cambio resumen + cada año de la serie
+  for (const [m, v] of Object.entries(j.poblacion_proyeccion_municipio.municipios)) {
+    assert.equal(
+      Number(csvByName[`poblacion_proyeccion_cambio_2020_${v.anio_comparacion_fin}: ${m}`]),
+      v.cambio_2020_fin_pct, `cambio poblacional ${m}`);
+    for (const [anio, pob] of Object.entries(v.serie)) {
+      assert.equal(Number(csvByName[`poblacion_proyeccion: ${m} ${anio}`]), pob, `población ${m} ${anio}`);
+    }
   }
 
   // proyectos: cuenta y distancia de cada uno

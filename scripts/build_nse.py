@@ -2,41 +2,49 @@
 """
 Genera los datos del mapa de geozonas de Aguascalientes:
 
-  1. data/ags_agebs.geojson       — polígonos AGEB (INEGI MG Censo 2020) con:
-                                    - NSE estimado (proxy propio, no AMAI)
-                                    - % viviendas deshabitadas
-                                    - Densidad de población (hab/km²)
-                                    - Crecimiento poblacional 2010–2020
-                                      (nivel municipio del ITER 2010 nacional)
-                                    - Población por sexo, grupos de edad
-                                      (0-14/15-24/25-59/60+ — ver nota de
-                                      cortes en el docstring de load_census),
-                                      discapacidad, vivienda y calidad de
-                                      vivienda (piso/electricidad/sanitario/
-                                      drenaje)
-  2. data/ags_price_zones.geojson — 6 zonas de precio aproximado ($/m²)
+  1. data/ags_agebs.geojson             — polígonos AGEB (INEGI MG Censo 2020) con:
+                                          - NSE estimado (proxy propio, no AMAI)
+                                          - % viviendas deshabitadas
+                                          - Densidad de población (hab/km²)
+                                          - Población por sexo, grupos de edad
+                                            (0-14/15-24/25-59/60+ — ver nota de
+                                            cortes en el docstring de load_census),
+                                            discapacidad, vivienda y calidad de
+                                            vivienda (piso/electricidad/sanitario/
+                                            drenaje)
+                                          - Marginación urbana 2020 (CONAPO,
+                                            oficial — ver load_conapo_marginacion)
+  2. data/ags_price_zones.geojson       — 6 zonas de precio aproximado ($/m²)
+  3. data/ags_poblacion_proyeccion.json — serie de población por municipio
+                                          1990-2040 (CONAPO, histórico +
+                                          proyección oficial; ver
+                                          build_poblacion_proyeccion)
 
 IMPORTANTE: el NSE aquí calculado es un PROXY PROPIO basado en datos abiertos.
 NO es el algoritmo oficial de AMAI ni los datos propietarios de Tinsa/RadarMX.
-Las zonas de precio son estimaciones de mercado (julio 2026), no valores
-catastrales ni avalúos.
+La marginación de CONAPO sí es un índice oficial. Las zonas de precio son
+estimaciones de mercado (julio 2026), no valores catastrales ni avalúos.
 
 Insumos esperados:
   data/raw/mg/conjunto_de_datos/01a.shp
   data/raw/iter/ageb_mza_urbana_01_cpv2020/conjunto_de_datos/
       conjunto_de_datos_ageb_urbana_01_cpv2020.csv
-  data/raw/iter_2010/iter_00_cpv2010/conjunto_de_datos/iter_00_cpv2010.csv
-      (ITER 2010 nacional — solo se usan totales municipales)
+  data/raw/conapo/IMU_2020.xls
+      (Índice de Marginación Urbana 2020, CONAPO — nacional, solo se usa AGS+JM)
+  data/raw/conapo/pobproy_ggrupos.csv
+      (Proyecciones de población CONAPO por municipio, grupos grandes de edad)
 
 Uso:  python scripts/build_nse.py
 """
 
+import json
 import math
 import os
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import xlrd
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHP = os.path.join(BASE, "data/raw/mg/conjunto_de_datos/01a.shp")
@@ -45,12 +53,11 @@ ITER_CSV = os.path.join(
     "data/raw/iter/ageb_mza_urbana_01_cpv2020/conjunto_de_datos/"
     "conjunto_de_datos_ageb_urbana_01_cpv2020.csv",
 )
-ITER_2010_CSV = os.path.join(
-    BASE,
-    "data/raw/iter_2010/iter_00_cpv2010/conjunto_de_datos/iter_00_cpv2010.csv",
-)
+CONAPO_IMU_XLS = os.path.join(BASE, "data/raw/conapo/IMU_2020.xls")
+CONAPO_POBPROY_CSV = os.path.join(BASE, "data/raw/conapo/pobproy_ggrupos.csv")
 OUT_AGEBS = os.path.join(BASE, "data/ags_agebs.geojson")
 OUT_ZONES = os.path.join(BASE, "data/ags_price_zones.geojson")
+OUT_POB_PROYECCION = os.path.join(BASE, "data/ags_poblacion_proyeccion.json")
 
 # Centro histórico de Aguascalientes (Plaza de la Patria, aprox.)
 CENTER_LON, CENTER_LAT = -102.2958, 21.8794
@@ -146,61 +153,80 @@ def load_census():
     return df
 
 
-# --------------------------------------------------------- crecimiento 2010
-def load_mun_pop_2020():
-    """Extrae población TOTAL municipal 2020 (fila 'Total del municipio',
-    LOC=0000) del mismo ITER_CSV ya usado para el resto del script.
+# --------------------------------------------------------------- CONAPO
+def load_conapo_marginacion():
+    """Índice y grado de Marginación Urbana 2020 de CONAPO, por AGEB.
 
-    Ojo: no sirve sumar POBTOT de las AGEBs urbanas de `gdf` para esto — esa
-    capa excluye localidades rurales, así que el municipio quedaría
-    subestimado frente al total 2010 (sobre todo en Jesús María, que tiene
-    población rural real fuera de la mancha urbana).
+    Fuente oficial (no un proxy propio como nse_score/nse_nivel arriba) —
+    correlaciona con el NSE (r≈0.84 en pruebas) pero no es redundante: hay
+    divergencias reales entre ambos índices. Se cruza por CVEGEO: el campo
+    "CVE_AGEB" de este archivo de CONAPO es, pese al nombre, el CVEGEO
+    completo de 13 dígitos (mismo formato que ya usamos).
+
+    ~10 de 373 AGEBs (todas con <60 habitantes) no tienen dato porque CONAPO
+    las excluye del cálculo del índice por baja confiabilidad estadística —
+    mismo criterio que ya aplicamos para marcar "S/D" en nse_nivel.
     """
-    df = pd.read_csv(ITER_CSV, dtype=str)
+    wb = xlrd.open_workbook(CONAPO_IMU_XLS)
+    sh = wb.sheet_by_name("IMU_2020")
+    header = [sh.cell_value(0, c) for c in range(sh.ncols)]
+    idx = {h: i for i, h in enumerate(header)}
     muns = {int(m) for m in NSE_MUNICIPIOS}
-    tot = df[(df["NOM_LOC"] == "Total del municipio") & (df["MUN"].astype(int).isin(muns))]
-    return {
-        row["MUN"].zfill(3): int(str(row["POBTOT"]).replace(",", ""))
-        for _, row in tot.iterrows()
-    }
 
-
-def load_mun_pop_2010():
-    """Extrae población total municipal del ITER 2010 (nivel Total del Municipio).
-    Retorna dict {cve_mun_str: pobtot_2010}.
-    Solo para municipios de Aguascalientes (entidad 01).
-    """
-    mun_pop = {}
-    try:
-        # utf-8-sig strips the BOM automatically
-        df10 = pd.read_csv(ITER_2010_CSV, dtype=str, encoding="utf-8-sig")
-        df10.columns = [c.strip().strip('"') for c in df10.columns]
-
-        ent_col_matches = [c for c in df10.columns if c.lower() == "entidad"]
-        if not ent_col_matches:
-            raise ValueError(f"Columna 'entidad' no encontrada. Columnas: {list(df10.columns[:10])}")
-        ent_col = ent_col_matches[0]
-
-        current_ent = None
-        for _, row in df10.iterrows():
-            raw_ent = str(row.get(ent_col, "")).strip()
-            if raw_ent and raw_ent not in ("", "nan"):
-                try:
-                    current_ent = str(int(raw_ent)).zfill(2)
-                except ValueError:
-                    pass
-            if current_ent != "01":
+    rows = []
+    for r in range(1, sh.nrows):
+        ent = sh.cell_value(r, idx["ENT"])
+        mun = sh.cell_value(r, idx["MUN"])
+        try:
+            if int(ent) != 1 or int(mun) not in muns:
                 continue
-            mun = str(row.get("mun", "")).strip().zfill(3)
-            loc = str(row.get("loc", "")).strip().zfill(4)
-            if mun != "000" and loc == "0000":
-                try:
-                    mun_pop[mun] = int(str(row["pobtot"]).replace(",", ""))
-                except Exception:
-                    pass
-    except Exception as e:
-        print(f"  Advertencia: no se pudo leer ITER 2010 ({e}). Crecimiento = N/D.")
-    return mun_pop
+        except (ValueError, TypeError):
+            continue
+        rows.append({
+            "CVEGEO": str(sh.cell_value(r, idx["CVE_AGEB"])).strip(),
+            "conapo_im": sh.cell_value(r, idx["IM_2020"]) or None,
+            "conapo_grado": sh.cell_value(r, idx["GM_2020"]) or None,
+            "conapo_imn": sh.cell_value(r, idx["IMN_2020"]) or None,
+        })
+    return pd.DataFrame(rows)
+
+
+def build_poblacion_proyeccion():
+    """Serie de población TOTAL por municipio, 1990-2040 (CONAPO): 1990-2020
+    es reconstrucción demográfica histórica, 2021-2040 es proyección oficial.
+
+    Mismo nivel geográfico (municipio completo) que crec_mun_2010_2020, pero
+    con 51 puntos anuales en vez de solo dos años — reemplaza ese cálculo de
+    2 puntos con una serie real para graficar tendencia en el panel de zona/
+    buffer. Se guarda aparte (no por AGEB): repetirla en cada una de las 373
+    AGEBs sería puro desperdicio para un dato que no varía dentro del
+    municipio.
+    """
+    df = pd.read_csv(CONAPO_POBPROY_CSV, dtype=str)
+    df = df[(df["CLAVE_ENT"] == "1") & (df["NOM_MUN"].isin(NSE_MUNICIPIOS.values()))].copy()
+    df["ANO"] = df["ANO"].astype(int)
+    df["POB_TOTAL"] = pd.to_numeric(df["POB_TOTAL"], errors="coerce")
+    agg = df.groupby(["NOM_MUN", "ANO"], as_index=False)["POB_TOTAL"].sum()
+
+    municipios = {}
+    for mun in NSE_MUNICIPIOS.values():
+        sub = agg[agg["NOM_MUN"] == mun].sort_values("ANO")
+        if sub.empty:
+            continue
+        municipios[mun] = {int(row.ANO): int(row.POB_TOTAL) for row in sub.itertuples()}
+
+    return {
+        "fuente": "CONAPO — Conciliación demográfica 1950-2019 y Proyecciones "
+                  "de la Población de México y las Entidades Federativas "
+                  "2020-2070 (corte municipal, grupos grandes de edad)",
+        "nota": "1990-2020: reconstrucción demográfica histórica. 2021-2040: "
+                "proyección oficial CONAPO. Nivel municipio completo (no por "
+                "AGEB ni zona) — mismo alcance que antes tenía "
+                "crec_mun_2010_2020, con muchos más puntos.",
+        "anio_min": int(df["ANO"].min()),
+        "anio_max": int(df["ANO"].max()),
+        "municipios": municipios,
+    }
 
 
 def minmax(s):
@@ -352,21 +378,10 @@ def main():
         gdf["POBTOT"] / (gdf_proj.geometry.area / 1e6)
     ).round(0)
 
-    # --- Crecimiento poblacional 2010–2020 (nivel municipio, municipio
-    # completo en ambos años — ver nota en load_mun_pop_2020) ---
-    mun_pop_2010 = load_mun_pop_2010()
-    mun_pop_2020 = load_mun_pop_2020()
-    print("Población municipal 2010:", mun_pop_2010)
-    print("Población municipal 2020:", mun_pop_2020)
-
-    crec_map = {}
-    for mun, pop2020 in mun_pop_2020.items():
-        pop2010 = mun_pop_2010.get(mun)
-        if pop2010 and pop2010 > 0:
-            crec_map[mun] = round((pop2020 - pop2010) / pop2010 * 100, 1)
-    print("Crecimiento municipal 2010-2020:", crec_map)
-
-    gdf["crec_mun_2010_2020"] = gdf["CVE_MUN"].map(crec_map)
+    # --- Marginación urbana 2020 (CONAPO) ---
+    conapo = load_conapo_marginacion()
+    print(f"AGEBs con dato de marginación CONAPO: {len(conapo)} / {len(gdf)}")
+    gdf = gdf.merge(conapo, on="CVEGEO", how="left")
 
     zones = build_price_zones(gdf)
 
@@ -375,7 +390,7 @@ def main():
             "GRAPROES", "PRO_OCUP_C", "pct_inter", "pct_pc", "pct_auto",
             "pct_serv", "pct_2dorm", "pct_3cuart",
             "nse_score", "nse_nivel",
-            "pct_deshabitadas", "densidad_hab_km2", "crec_mun_2010_2020",
+            "pct_deshabitadas", "densidad_hab_km2",
             # --- campos agregados para la tabla "Población/Vivienda en la
             # zona de influencia" de los estudios de mercado (ver nota de
             # cortes de edad arriba de load_census) ---
@@ -384,11 +399,25 @@ def main():
             "pob_discapacidad",
             "VIVTOT", "TVIVPAR",
             "pct_piso_firme", "pct_electricidad", "pct_sanitario", "pct_drenaje",
+            # --- marginación urbana 2020 (CONAPO, oficial — ver load_conapo_marginacion) ---
+            "conapo_im", "conapo_grado", "conapo_imn",
             "geometry"]
     gdf[cols].to_file(OUT_AGEBS, driver="GeoJSON")
     zones.to_file(OUT_ZONES, driver="GeoJSON")
     print(f"Escrito {OUT_AGEBS} ({os.path.getsize(OUT_AGEBS)//1024} KB)")
     print(f"Escrito {OUT_ZONES} ({os.path.getsize(OUT_ZONES)//1024} KB)")
+
+    pob_proyeccion = build_poblacion_proyeccion()
+    with open(OUT_POB_PROYECCION, "w", encoding="utf-8") as f:
+        json.dump(pob_proyeccion, f, ensure_ascii=False, indent=2)
+    print(f"Escrito {OUT_POB_PROYECCION} ({os.path.getsize(OUT_POB_PROYECCION)//1024} KB)")
+    print("Proyección de población por municipio:")
+    for mun, serie in pob_proyeccion["municipios"].items():
+        anios_muestra = sorted(serie.keys())
+        print(f"  {mun}: {anios_muestra[0]}={serie[anios_muestra[0]]:,} … {anios_muestra[-1]}={serie[anios_muestra[-1]]:,} ({len(serie)} puntos)")
+
+    print("\nDistribución de marginación CONAPO (grado):")
+    print(gdf["conapo_grado"].value_counts(dropna=False).to_string())
     print("\nDistribución NSE:")
     print(gdf["nse_nivel"].value_counts().to_string())
     print("\nAGEBs por zona de precio:")
