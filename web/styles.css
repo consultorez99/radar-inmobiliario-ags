@@ -196,6 +196,18 @@ body.buffer-picking #map * {
   color: var(--accent);
 }
 
+/* capa cuyo dato se está descargando (PDU bajo demanda) */
+.layer-btn.loading {
+  opacity: 0.55;
+  cursor: progress;
+  animation: layer-btn-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes layer-btn-pulse {
+  from { opacity: 0.55; }
+  to   { opacity: 0.9; }
+}
+
 .layer-icon { display: flex; }
 
 .layer-icon svg { width: 20px; height: 20px; }

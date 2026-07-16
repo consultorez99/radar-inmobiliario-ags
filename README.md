@@ -69,14 +69,14 @@ python3 -m http.server 8000
 
 ```
 data/
-  ags_agebs.geojson          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona,
+  ags_agebs.json          # 373 AGEBs (332 Ags + 41 Jesús María) con nse_score, nse_nivel, zona,
                              # variables censales, pct_deshabitadas, densidad_hab_km2 y
                              # conapo_im/conapo_grado/conapo_imn (marginación urbana, CONAPO)
-  ags_price_zones.geojson    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
+  ags_price_zones.json    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
   ags_poblacion_proyeccion.json  # población por municipio 1990-2040 (CONAPO, histórico + proyección)
-  ags_catastral.geojson      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
-  ags_pdu.geojson            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
-  ags_poi.geojson            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
+  ags_catastral.json      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
+  ags_pdu.json            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
+  ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
 scripts/
   build_nse.py               # regenera agebs + price_zones desde los insumos
@@ -209,7 +209,7 @@ distribución relativa *dentro del municipio*; los datos censales son de 2020.
 
 ## Densidad y viviendas deshabitadas
 
-Dos campos adicionales por AGEB en `ags_agebs.geojson`, calculados en
+Dos campos adicionales por AGEB en `ags_agebs.json`, calculados en
 `build_nse.py` a partir del mismo Censo 2020 ya usado para el NSE:
 
 - **`densidad_hab_km2`** — `POBTOT` entre el área del polígono AGEB
@@ -357,4 +357,8 @@ build ni servidor propio.
 5. `data/raw/` y `.venv/` están en `.gitignore` — no se despliegan (son
    insumos de build, no hacen falta en producción). Si necesitas regenerar
    los GeoJSON, hazlo localmente con los scripts de `scripts/` y sube los
-   archivos `data/*.geojson` resultantes.
+   archivos `data/ags_*.json` resultantes.
+6. Los datos GeoJSON usan extensión `.json` (no `.geojson`) a propósito: el
+   CDN de Render solo comprime content-types que reconoce, y `.geojson` se
+   sirve como `binary/octet-stream` sin comprimir (~9.9 MB planos vs ~3 MB
+   con brotli/gzip). No renombrar a `.geojson`.

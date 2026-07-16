@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Genera data/ags_pdu.geojson: zonificación secundaria de los Programas de
+Genera data/ags_pdu.json: zonificación secundaria de los Programas de
 Desarrollo Urbano de Aguascalientes y Jesús María, publicados por SEGUOT /
 IMPLAN Aguascalientes en sus visores ArcGIS Online.
 
@@ -36,7 +36,7 @@ from shapely.geometry import shape
 from shapely.ops import unary_union
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(BASE, "data/ags_pdu.geojson")
+OUT = os.path.join(BASE, "data/ags_pdu.json")
 
 AGS_WEBMAP = os.path.join(BASE, "data/raw/pduca_webmap.json")
 AGS_LAYER_DETAIL = "PDUCA 2040 ev2 : Zonificación secundaria para zona urbana a consolidar y densificar"

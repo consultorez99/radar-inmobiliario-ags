@@ -329,19 +329,32 @@ function pduPopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Programa de Desarrollo Urbano oficial de cada municipio (IMPLAN Aguascalientes / Jesús María). Verificar con el municipio correspondiente para trámites.</div>`;
 }
 
+// Helper: cuando bufferPicking está activo, el click en cualquier polígono
+// se redirige al análisis de radio en lugar de abrir el popup.
+function layerClick(e) {
+  if (window.bufferPicking) {
+    L.DomEvent.stopPropagation(e); // evita que Leaflet abra el popup
+    map.closePopup();
+    window.onBufferMapClick({ latlng: e.latlng });
+    return;
+  }
+}
+
 // ------------------------------------------------------------ carga de datos
+// El PDU (~3.4 MB, el archivo más pesado) no se descarga al inicio: lo trae
+// ensurePdu() cuando algo lo necesita (capa PDU, análisis de radio o de zona),
+// con un prefetch en segundo plano una vez pintado el mapa.
 async function loadData() {
-  const [agebsResp, zonesResp, catResp, pduResp] = await Promise.all([
-    fetch("../data/ags_agebs.geojson"),
-    fetch("../data/ags_price_zones.geojson"),
-    fetch("../data/ags_catastral.geojson"),
-    fetch("../data/ags_pdu.geojson"),
+  const [agebsResp, zonesResp, catResp] = await Promise.all([
+    fetch("../data/ags_agebs.json"),
+    fetch("../data/ags_price_zones.json"),
+    fetch("../data/ags_catastral.json"),
   ]);
-  if (!agebsResp.ok || !zonesResp.ok || !catResp.ok || !pduResp.ok) {
+  if (!agebsResp.ok || !zonesResp.ok || !catResp.ok) {
     throw new Error("No se pudieron cargar los GeoJSON. Sirve el proyecto con un servidor estático (ver README).");
   }
-  const [agebs, zones, cat, pdu] = await Promise.all([agebsResp.json(), zonesResp.json(), catResp.json(), pduResp.json()]);
-  Object.assign(DATA, { agebs, zones, cat, pdu });
+  const [agebs, zones, cat] = await Promise.all([agebsResp.json(), zonesResp.json(), catResp.json()]);
+  Object.assign(DATA, { agebs, zones, cat });
   buildColoniaIndex(cat);
 
   // Serie de población por municipio (CONAPO, 1990-2040) — dato de contexto
@@ -351,17 +364,6 @@ async function loadData() {
     const proyResp = await fetch("../data/ags_poblacion_proyeccion.json");
     if (proyResp.ok) DATA.poblacionProyeccion = await proyResp.json();
   } catch (err) { console.warn("No se pudo cargar la proyección de población:", err); }
-
-  // Helper: cuando bufferPicking está activo, el click en cualquier polígono
-  // se redirige al análisis de radio en lugar de abrir el popup.
-  function layerClick(e) {
-    if (window.bufferPicking) {
-      L.DomEvent.stopPropagation(e); // evita que Leaflet abra el popup
-      map.closePopup();
-      window.onBufferMapClick({ latlng: e.latlng });
-      return;
-    }
-  }
 
   nseLayer = L.geoJSON(agebs, {
     style: nseStyle,
@@ -403,16 +405,6 @@ async function loadData() {
     },
   });
 
-  pduLayer = L.geoJSON(pdu, {
-    style: pduStyle,
-    onEachFeature: (f, layer) => {
-      layer.bindPopup(pduPopup(f.properties), { maxWidth: 310 });
-      layer.on("click",     layerClick);
-      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ fillOpacity: 0.72 }); });
-      layer.on("mouseout",  () => pduLayer.resetStyle(layer));
-    },
-  });
-
   densLayer = L.geoJSON(agebs, {
     style: pctStyle(DENS_BINS, "densidad_hab_km2"),
     onEachFeature: (f, layer) => {
@@ -446,7 +438,40 @@ async function loadData() {
   nseLayer.addTo(map);
   map.fitBounds(nseLayer.getBounds(), { padding: [20, 20] });
   buildLegends();
+
+  // Prefetch del PDU una vez pintado el mapa: no compite con la carga inicial
+  // pero en la práctica ya está descargado cuando el usuario lo pide.
+  setTimeout(() => { ensurePdu().catch(() => {}); }, 2500);
 }
+
+// Carga diferida del PDU. Memoizada: el primer interesado (botón PDU, análisis
+// de radio en buffer.js o de zona en zona.js) dispara la descarga y los demás
+// esperan la misma promesa. Si falla, se limpia para poder reintentar.
+let pduPromise = null;
+function ensurePdu() {
+  if (!pduPromise) {
+    pduPromise = fetch("../data/ags_pdu.json")
+      .then((resp) => {
+        if (!resp.ok) throw new Error("No se pudo cargar la capa PDU. Intenta de nuevo.");
+        return resp.json();
+      })
+      .then((pdu) => {
+        DATA.pdu = pdu;
+        pduLayer = L.geoJSON(pdu, {
+          style: pduStyle,
+          onEachFeature: (f, layer) => {
+            layer.bindPopup(pduPopup(f.properties), { maxWidth: 310 });
+            layer.on("click",     layerClick);
+            layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ fillOpacity: 0.72 }); });
+            layer.on("mouseout",  () => pduLayer.resetStyle(layer));
+          },
+        });
+      })
+      .catch((err) => { pduPromise = null; throw err; });
+  }
+  return pduPromise;
+}
+window.ensurePdu = ensurePdu;
 
 // ------------------------------------------------------------------ leyendas
 function buildLegends() {
@@ -506,8 +531,24 @@ const LAYERS = {
   marg: () => margLayer,
 };
 
+let pduLayerPending = false; // click en PDU mientras descarga: activarla al llegar
+
 function setLayer(name) {
-  if (Object.values(LAYERS).some((get) => !get())) return;
+  if (!nseLayer) return; // datos base aún cargando
+  if (name !== "pdu") pduLayerPending = false; // el usuario cambió de opinión
+
+  if (name === "pdu" && !pduLayer) {
+    if (pduLayerPending) return; // descarga ya en camino
+    pduLayerPending = true;
+    const btn = document.getElementById("btn-pdu");
+    btn.classList.add("loading");
+    ensurePdu()
+      .then(() => { if (pduLayerPending) { pduLayerPending = false; setLayer("pdu"); } })
+      .catch((err) => { pduLayerPending = false; alert(err.message); })
+      .finally(() => btn.classList.remove("loading"));
+    return;
+  }
+
   const turningOff = name === activeLayerName;
   activeLayerName = turningOff ? null : name;
 
@@ -516,6 +557,7 @@ function setLayer(name) {
     document.getElementById(`btn-${key}`).classList.toggle("active", isActive);
     document.getElementById(`legend-${key}`).classList.toggle("hidden", !isActive);
     const layer = LAYERS[key]();
+    if (!layer) continue; // pdu aún no descargado
     if (isActive) layer.addTo(map);
     else map.removeLayer(layer);
   }

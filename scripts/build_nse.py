@@ -2,7 +2,7 @@
 """
 Genera los datos del mapa de geozonas de Aguascalientes:
 
-  1. data/ags_agebs.geojson             — polígonos AGEB (INEGI MG Censo 2020) con:
+  1. data/ags_agebs.json             — polígonos AGEB (INEGI MG Censo 2020) con:
                                           - NSE estimado (proxy propio, no AMAI)
                                           - % viviendas deshabitadas
                                           - Densidad de población (hab/km²)
@@ -14,7 +14,7 @@ Genera los datos del mapa de geozonas de Aguascalientes:
                                             drenaje)
                                           - Marginación urbana 2020 (CONAPO,
                                             oficial — ver load_conapo_marginacion)
-  2. data/ags_price_zones.geojson       — 6 zonas de precio aproximado ($/m²)
+  2. data/ags_price_zones.json       — 6 zonas de precio aproximado ($/m²)
   3. data/ags_poblacion_proyeccion.json — serie de población por municipio
                                           1990-2040 (CONAPO, histórico +
                                           proyección oficial; ver
@@ -55,8 +55,8 @@ ITER_CSV = os.path.join(
 )
 CONAPO_IMU_XLS = os.path.join(BASE, "data/raw/conapo/IMU_2020.xls")
 CONAPO_POBPROY_CSV = os.path.join(BASE, "data/raw/conapo/pobproy_ggrupos.csv")
-OUT_AGEBS = os.path.join(BASE, "data/ags_agebs.geojson")
-OUT_ZONES = os.path.join(BASE, "data/ags_price_zones.geojson")
+OUT_AGEBS = os.path.join(BASE, "data/ags_agebs.json")
+OUT_ZONES = os.path.join(BASE, "data/ags_price_zones.json")
 OUT_POB_PROYECCION = os.path.join(BASE, "data/ags_poblacion_proyeccion.json")
 
 # Centro histórico de Aguascalientes (Plaza de la Patria, aprox.)
