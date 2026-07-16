@@ -1,3 +1,7 @@
+# OJO: este archivo solo aplica si el servicio está gestionado por Blueprint
+# (New + → Blueprint sobre el repo; adopta el servicio existente por `name`).
+# Un Static Site creado a mano en el dashboard lo ignora — autodeploya desde
+# GitHub pero NO aplica `headers` ni `routes`. Ver "Despliegue" en README.md.
 services:
   - type: web
     name: radar-inmobiliario-ags

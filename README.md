@@ -345,10 +345,19 @@ exclusiva como las demás — se ve encima de cualquier capa activa.
 El sitio es 100% estático (HTML/JS/CSS + GeoJSON pre-calculado), no necesita
 build ni servidor propio.
 
-1. En [render.com](https://render.com) → **New +** → **Static Site**.
-2. Conecta este repositorio.
-3. Si Render detecta `render.yaml` (Blueprint), toma la configuración
-   automáticamente. Si prefieres configurarlo a mano:
+1. En [render.com](https://render.com) → **New +** → **Blueprint** (no
+   "Static Site") y conecta este repositorio. Solo los servicios creados o
+   adoptados vía Blueprint aplican el `render.yaml`; un Static Site creado a
+   mano hace autodeploy desde GitHub pero **ignora** las secciones `headers`
+   y `routes` del yaml (verificado: el sitio servía `Cache-Control:
+   max-age=0` en lugar del `max-age=3600` declarado).
+2. Si el servicio ya existe (creado a mano), hay dos salidas:
+   - **New +** → **Blueprint** sobre este repo: Render adopta el servicio
+     existente porque el `name` del yaml coincide, y desde entonces aplica
+     headers y routes.
+   - O configurar los headers a mano en el dashboard del sitio (pestaña
+     **Headers**): path `/*`, `Cache-Control`, `public, max-age=3600`.
+3. Configuración manual equivalente, si no se usa Blueprint:
    - **Publish directory**: `.` (raíz del repo, para que `web/` y `data/`
      queden ambos publicados).
    - **Build command**: (vacío).
