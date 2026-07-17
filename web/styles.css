@@ -1017,8 +1017,85 @@ body.buffer-picking #map * {
 .hidden { display: none !important; }
 
 @media (max-width: 640px) {
+  /* ---- Header: una sola fila — marca compacta + buscador + botones-icono ---- */
+  .app-header { gap: 8px; padding: 8px 10px; }
   .brand h1 { font-size: 14px; }
   .brand-sub { display: none; }
-  .about-btn { padding: 6px 8px; }
-  .legend { max-width: 200px; font-size: 11px; }
+  .search-box { max-width: none; }
+  .search-box input { padding: 8px 10px; font-size: 13px; }
+  .about-btn {
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .about-btn .btn-label { display: none; }
+
+  .app-footer {
+    padding: 3px 10px;
+    font-size: 9.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ---- Panel de capas: de columna fija a barra inferior con scroll horizontal ---- */
+  .layer-panel {
+    top: auto;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .layer-btn {
+    flex: 0 0 auto;
+    width: 54px;
+  }
+  .layer-label { font-size: 10px; }
+  .panel-sep {
+    flex: 0 0 auto;
+    width: 1px;
+    height: auto;
+    margin: 4px 3px;
+  }
+
+  /* ---- Leyenda: recortada y con tope de altura, sobre la barra de capas ---- */
+  .legend {
+    bottom: 76px;
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    max-height: 34vh;
+    overflow-y: auto;
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+
+  /* ---- Paneles flotantes: ancho completo, dejando espacio para header/barra ---- */
+  .zone-panel {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100% - 96px);
+  }
+  .compare-panel {
+    bottom: 76px;
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    overflow-x: auto;
+  }
+  .zone-cards { grid-template-columns: 1fr 1fr; }
+  .zone-chart { height: 150px; }
+
+  /* ---- Modales: menos padding, más ancho útil ---- */
+  .modal-backdrop { padding: 10px; }
+  .modal { padding: 16px; max-height: 90vh; }
+  .modal-wide { max-width: none; }
 }
