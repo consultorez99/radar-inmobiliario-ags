@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <header class="app-header">
@@ -353,6 +353,15 @@
         (r≈0.84 en pruebas internas) pero no son intercambiables — hay AGEBs donde divergen. Como
         con el NSE, las AGEBs muy pequeñas (menos de ~60 habitantes) quedan sin dato porque CONAPO
         las excluye del cálculo por baja confiabilidad estadística.</p>
+      <h3>Índice SHF de precios de la vivienda</h3>
+      <p>Serie trimestral oficial (1T2005 a la fecha, base 2017=100) del <em>Índice SHF de
+        Precios de la Vivienda en México</em> de Sociedad Hipotecaria Federal, para el nivel
+        nacional, el estado y los municipios de Aguascalientes y Jesús María. <strong>Es dato
+        abierto oficial (Libre Uso MX)</strong>, construido con avalúos de vivienda con crédito
+        hipotecario garantizado. Alimenta la gráfica de evolución del panel "Vivienda nueva" y la
+        apreciación anual que aparece en los popups de zonas de precio. El índice mide variación
+        (apreciación), no precio absoluto, y es por municipio completo — no distingue zonas
+        dentro de la ciudad.</p>
       <h3>Vivienda nueva (panel "Vivienda nueva")</h3>
       <p>Precio por m², absorción (ritmo de venta) y éxito comercial por segmento y tipo de
         producto, tomados de un estudio de mercado de terceros (corte 1T26).
@@ -372,7 +381,8 @@
       <ul>
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
         <li>INEGI — Censo 2020, resultados por AGEB y manzana urbana (ITER).</li>
-        <li>SHF — Índice de Precios de la Vivienda; medios y portales inmobiliarios (jul 2026).</li>
+        <li>SHF — Índice de Precios de la Vivienda en México, datos abiertos trimestrales
+          1T2005-1T2026 (Libre Uso MX); medios y portales inmobiliarios (jul 2026).</li>
         <li>IMPLAN Aguascalientes — PDUCA 2040 ev.2, visor ArcGIS Online.</li>
         <li>SEGUOT — Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 y
           Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040, visores ArcGIS Online.</li>
@@ -401,10 +411,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=8"></script>
+  <script src="main.js?v=9"></script>
   <script src="zona.js?v=6"></script>
   <script src="reporte.js?v=6"></script>
-  <script src="softec.js?v=2"></script>
+  <script src="softec.js?v=3"></script>
   <script src="config.js?v=1"></script>
   <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=4"></script>

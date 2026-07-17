@@ -196,6 +196,13 @@ body.buffer-picking #map * {
   color: var(--accent);
 }
 
+/* gráfica del índice SHF en el panel Vivienda nueva */
+.softec-chart {
+  position: relative;
+  height: 230px;
+  margin: 8px 0 4px;
+}
+
 /* capa cuyo dato se está descargando (PDU bajo demanda) */
 .layer-btn.loading {
   opacity: 0.55;
