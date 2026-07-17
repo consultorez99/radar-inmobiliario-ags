@@ -627,10 +627,46 @@ function buildColoniaIndex(cat) {
   }));
 }
 
+// TIPOs oficiales del catálogo DCAH: el usuario rara vez adivina el correcto
+// ("Colonia X" cuando en realidad es "Fraccionamiento X"), así que se recorta
+// como palabra líder de la búsqueda si aparece.
+const TIPOS_CATASTRO = [
+  "FRACCIONAMIENTO", "CONJUNTO HABITACIONAL", "UNIDAD HABITACIONAL",
+  "PARQUE INDUSTRIAL", "ZONA MILITAR", "RANCHERIA", "CONDOMINIO",
+  "COLONIA", "BARRIO", "EJIDO", "PUEBLO", "COTO",
+];
+// Municipios que cubre el catálogo: el usuario suele calificar la colonia
+// con el municipio o "..., Aguascalientes" (estado) al final.
+const MUNICIPIOS_RUIDO = ["JESUS MARIA", "AGUASCALIENTES"];
+
 function localMatches(q) {
-  const nq = normalize(q);
-  if (nq.length < 2) return [];
-  return coloniaIndex.filter((c) => c.key.includes(nq)).slice(0, 8);
+  // Núcleo: quitar todo tras la primera coma (ninguna colonia del catálogo
+  // tiene coma en el nombre — "Colonia México, Aguascalientes" no debe
+  // buscar el string completo) y un TIPO inicial adivinado.
+  let core = normalize(q.split(",")[0]);
+  for (const tipo of TIPOS_CATASTRO) {
+    if (core.startsWith(tipo + " ")) { core = core.slice(tipo.length + 1); break; }
+  }
+  if (core.length < 2) return [];
+
+  let r = coloniaIndex.filter((c) => c.key.includes(core));
+
+  // Solo si el intento preciso no encontró nada, un segundo intento más
+  // amplio quitando un municipio/estado sobrante SIN coma (p.ej. "Bosques
+  // del Prado Aguascalientes"). No tocar el intento preciso si ya encontró
+  // algo: ampliar de más puede sacar de los primeros 8 resultados a
+  // colonias cuyo nombre real termina en el municipio (hay 9 así, p.ej.
+  // "Lomas de Jesús María").
+  if (!r.length) {
+    let nq = core;
+    for (let i = 0; i < 2; i++) {
+      const ruido = MUNICIPIOS_RUIDO.find((m) => nq.length > m.length + 2 && nq.endsWith(" " + m));
+      if (!ruido) break;
+      nq = nq.slice(0, nq.length - ruido.length - 1).trim();
+    }
+    if (nq.length >= 2 && nq !== core) r = coloniaIndex.filter((c) => c.key.includes(nq));
+  }
+  return r.slice(0, 8);
 }
 
 function goToColonia(item) {
@@ -673,9 +709,12 @@ async function geocode(query) {
   if (now - lastSearchAt < 1100) return; // respeta 1 req/seg
   lastSearchAt = now;
 
+  // Si el usuario ya calificó con coma ("...  , Aguascalientes"), no repetir
+  // el sufijo — bounded+viewbox ya acotan la búsqueda a la zona igual.
+  const q = query.includes(",") ? query : query + ", Aguascalientes, Aguascalientes, México";
   const url = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
     format: "json",
-    q: query + ", Aguascalientes, Aguascalientes, México",
+    q,
     viewbox: AGS_VIEWBOX,
     bounded: "1",
     limit: "5",
