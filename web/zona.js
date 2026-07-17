@@ -48,6 +48,7 @@ function clearZone() {
   window.clearBufferAnalysis?.(false);
   document.getElementById("btn-png").classList.add("hidden");
   document.getElementById("zone-panel").classList.add("hidden");
+  window.plActualizar?.();
 }
 
 function setZone(polygon) {
@@ -63,6 +64,7 @@ function setZone(polygon) {
   currentZone = polygon;
   currentStats = analyzeZone(polygon);
   renderZonePanel(currentStats);
+  window.plActualizar?.();
 }
 
 // ------------------------------------------------------------- estadísticas

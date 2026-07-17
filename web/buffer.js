@@ -223,6 +223,7 @@ function runBufferAnalysis(lat, lng, radiusKm, { fit = true } = {}) {
   // animate:false — un redibujo inmediato (p.ej. cambiar de radio) durante la
   // animación de zoom deja el mapa en un estado de zoom incorrecto
   if (fit) map.fitBounds(bufferGroup.getBounds(), { padding: [30, 30], animate: false });
+  window.plActualizar?.();
 }
 
 window.getBufferStats = () => bufferStats;
@@ -238,6 +239,7 @@ window.clearBufferAnalysis = function (hidePanel = true) {
   if (hidePanel && !currentZone) {
     document.getElementById("zone-panel").classList.add("hidden");
   }
+  window.plActualizar?.();
 };
 
 // ------------------------------------------------------- selección del punto
