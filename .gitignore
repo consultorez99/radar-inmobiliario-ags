@@ -13,5 +13,9 @@ __pycache__/
 # Sistema
 .DS_Store
 
+# Exportación XLSX para análisis: incluye tablas del estudio de mercado de
+# terceros (Softec) que el despacho adquirió — no es dato abierto, no se versiona.
+Radar_Inmobiliario_Ags_datos.xlsx
+
 # Dependencias de los tests (npm)
 node_modules/
