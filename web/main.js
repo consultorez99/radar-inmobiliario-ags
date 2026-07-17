@@ -462,12 +462,18 @@ async function loadData() {
   });
 
   nseLayer.addTo(map);
-  map.fitBounds(nseLayer.getBounds(), { padding: [20, 20] });
+  // si la URL trae una vista compartida (#map=...), permalink.js ya la aplicó
+  if (!/[#&]map=/.test(location.hash)) {
+    map.fitBounds(nseLayer.getBounds(), { padding: [20, 20] });
+  }
   buildLegends();
 
   // Prefetch del PDU una vez pintado el mapa: no compite con la carga inicial
   // pero en la práctica ya está descargado cuando el usuario lo pide.
   setTimeout(() => { ensurePdu().catch(() => {}); }, 2500);
+
+  // restaurar capa/overlays/análisis del permalink (necesita los datos ya cargados)
+  window.plRestaurar?.();
 }
 
 // Carga diferida del PDU. Memoizada: el primer interesado (botón PDU, análisis
@@ -587,6 +593,7 @@ function setLayer(name) {
     if (isActive) layer.addTo(map);
     else map.removeLayer(layer);
   }
+  window.plActualizar?.();
 }
 
 for (const key of ["nse", "price", "cat", "sup", "pdu", "dens", "desh", "marg"]) {

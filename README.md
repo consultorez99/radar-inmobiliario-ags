@@ -48,6 +48,11 @@ Herramientas interactivas:
   mapa, gráficos y tabla de colonias con fuentes y disclaimer).
 - **Comparador**: botón "⚖️ Comparar" en los popups de la capa Catastral para
   contrastar hasta 4 colonias lado a lado.
+- **Permalinks**: la URL codifica la vista, la capa activa, las superpuestas y
+  el análisis (radio o polígono dibujado) en el hash — copiar la barra de
+  direcciones comparte el análisis tal cual se ve
+  (`#map=13/21.88/-102.29&capa=pdu&buf=21.88,-102.29,1.5`). Ver
+  `web/permalink.js`.
 - Panel de capas, leyendas flotantes y modal "Acerca de".
 
 > ⚠️ **Proyecto independiente.** Sin afiliación con RadarMX, AMAI ni otros proveedores comerciales de datos.
