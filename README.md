@@ -86,6 +86,8 @@ data/
   ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
   ags_denue_proxy.json    # NSE estimado EXPERIMENTAL (Bajo/Medio/Alto) en 20 zonas sin AGEB 2020,
                              # modelo calibrado con DENUE — no es dato censal, ver metodología en README abajo
+  ags_denue_negocios.json # directorio DENUE completo: 57,931 negocios (Ags + JM), sin modelo,
+                             # formato compacto (arrays posicionales, ver meta.esquema en el archivo)
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
 scripts/
   build_nse.py               # regenera agebs + price_zones desde los insumos
@@ -93,6 +95,7 @@ scripts/
   build_pdu.py               # convierte los webmaps ArcGIS de IMPLAN (Ags + Jesús María) a un solo GeoJSON
   build_poi.py               # consulta Overpass API y genera la capa de puntos de interés
   build_denue_proxy.py       # calibra el modelo NSE-por-DENUE y genera la capa "Estimado" (ver metodología abajo)
+  build_denue_negocios.py    # exporta el directorio DENUE completo (dato crudo) para la capa "Negocios"
   build_shf.py               # parsea el XLSX de datos abiertos del Índice SHF (descarga trimestral manual)
   geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
