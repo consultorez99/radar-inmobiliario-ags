@@ -46,6 +46,8 @@ function clearZone() {
   currentZone = null;
   currentStats = null;
   window.clearBufferAnalysis?.(false);
+  document.getElementById("btn-csv").classList.add("hidden");
+  document.getElementById("btn-json").classList.add("hidden");
   document.getElementById("btn-png").classList.add("hidden");
   document.getElementById("zone-panel").classList.add("hidden");
   window.plActualizar?.();
@@ -192,8 +194,8 @@ function renderZonePanel(s) {
 
   // mostrar el panel ANTES de crear los charts: con el panel oculto los
   // canvas miden 0x0 y las imágenes para el PDF salen corruptas
-  document.getElementById("btn-csv").classList.add("hidden");
-  document.getElementById("btn-json").classList.add("hidden");
+  document.getElementById("btn-csv").classList.remove("hidden");
+  document.getElementById("btn-json").classList.remove("hidden");
   document.getElementById("btn-png").classList.remove("hidden");
   document.getElementById("zone-panel").classList.remove("hidden");
   renderZoneCharts(s);
@@ -308,4 +310,200 @@ window.removeCompareIdx = removeCompare;
 document.getElementById("compare-close").addEventListener("click", () => {
   compareList.length = 0;
   renderCompare();
+});
+
+// --------------------------------------------------------------- CSV / JSON
+// Exportación de la zona de polígono (paralela a exportBufferCSV/JSON en buffer.js)
+const csvEscapeZona = BufferCore.csvEscape;
+
+function exportZonaCSV() {
+  if (!currentStats || !currentZone) return;
+  const s = currentStats;
+  const fmt0 = (n) => n == null ? "s/d" : Math.round(n);
+  const fmt1 = (n) => n == null ? "s/d" : Number(n.toFixed(1));
+  const fmt2 = (n) => n == null ? "s/d" : Number(n.toFixed(2));
+
+  const F_CENSO = "INEGI Censo 2020 (AGEB urbana)";
+  const F_CAT   = "Leyes de Ingresos 2026 (Aguascalientes y Jesús María)";
+  const F_PDU   = "PDUCA 2040 ev.2 / PDU Cd. Jesús María 2015-2035 / PMDU Jesús María 2017-2040";
+  const F_CONAPO = "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040";
+  const M_POLIGONO = "suma directa de las AGEBs que intersectan el polígono dibujado (sin ponderación por fracción de área)";
+
+  const rows = [["metrica", "valor", "unidad", "fuente", "metodo"]];
+  const add = (m, v, u, f, met) => rows.push([m, v ?? "s/d", u, f, met]);
+
+  add("tipo_analisis", "polígono dibujado", "", "usuario", "área delimitada manualmente");
+  add("area_poligono", fmt2(s.areaKm2), "km²", "cálculo propio", "área geométrica del polígono");
+  add("agebs_intersectadas", s.nAgebs, "AGEBs", F_CENSO, "AGEBs con intersección no vacía con el polígono");
+
+  add("poblacion_estimada", fmt0(s.pop), "habitantes", F_CENSO, M_POLIGONO);
+  add("nse_predominante", s.nivelPred || "s/d", "", "NSE proxy propio con Censo 2020 (no AMAI)", M_POLIGONO);
+  add("nse_score", fmt2(s.nseScore), "índice NSE", "NSE proxy propio con Censo 2020 (no AMAI)", "promedio ponderado por población");
+  add("pct_viviendas_2mas_recamaras", fmt1(s.pct2dorm), "% de viviendas habitadas", F_CENSO, M_POLIGONO);
+  add("pct_viviendas_3mas_cuartos", fmt1(s.pct3cuart), "% de viviendas habitadas", F_CENSO, M_POLIGONO);
+
+  // NSE por nivel
+  const NSE_ORDEN = BufferCore.NSE_NIVELES_ORDEN;
+  for (const nivel of NSE_ORDEN) {
+    const cnt = s.nseCounts?.[nivel];
+    if (cnt != null) add(`nse_${nivel}_agebs`, cnt, "AGEBs", "NSE proxy propio con Censo 2020 (no AMAI)", M_POLIGONO);
+  }
+
+  // Catastral
+  if (s.catStats) {
+    add("catastral_colonias", s.catStats.n, "colonias", F_CAT, "colonias con punto representativo dentro del polígono");
+    add("catastral_min",    s.catStats.min, "$/m² de suelo", F_CAT, "");
+    add("catastral_promedio", s.catStats.avg, "$/m² de suelo", F_CAT, "");
+    add("catastral_mediana", s.catStats.med, "$/m² de suelo", F_CAT, "");
+    add("catastral_max",    s.catStats.max, "$/m² de suelo", F_CAT, "");
+  }
+  for (const c of (s.cols || [])) {
+    const nom = `${c.TIPO !== "NINGUNO" ? c.TIPO + " " : ""}${c.NOM_ASEN} (${c.municipio || "—"})`;
+    add(`colonia: ${nom}`, c.valor_m2, "$/m² de suelo", F_CAT, "");
+  }
+
+  // Zonas de precio de mercado
+  for (const z of (s.priceZones || [])) {
+    add(`zona_mercado: ${z.zona}`, `${z.precio_m2_min}–${z.precio_m2_max}`, "$/m²",
+      "estudio de mercado de terceros, corte 1T26", "zonas cuyo polígono intersecta el área dibujada");
+  }
+
+  // PDU
+  const pduTotal = Object.values(s.pduShares || {}).reduce((a, b) => a + b, 0);
+  for (const [g, km2] of Object.entries(s.pduShares || {}).sort((a, b) => b[1] - a[1])) {
+    add(`uso_suelo: ${g}`, fmt1(pduTotal > 0 ? (km2 / s.areaKm2) * 100 : null),
+      "% del área del polígono", F_PDU, "área de intersección de la zonificación con el polígono");
+  }
+  if (pduTotal > 0) {
+    const sinPdu = Math.max(0, 100 - pduTotal / s.areaKm2 * 100);
+    add("uso_suelo: sin zonificación PDU", fmt1(sinPdu), "% del área del polígono", F_PDU, "");
+  }
+
+  // Proyección de población (CONAPO)
+  const M_POB = "dato del municipio completo, no específico de la zona dibujada";
+  if (s.poblacionMunicipios) {
+    for (const [mun, v] of Object.entries(s.poblacionMunicipios.municipios)) {
+      add(`poblacion_proyeccion_cambio_2020_${v.anioComparacionFin}: ${mun}`,
+        v.cambio2020FinPct, "% (municipio completo)", F_CONAPO, M_POB);
+      for (const [anio, pob] of Object.entries(v.serie)) {
+        add(`poblacion_proyeccion: ${mun} ${anio}`, pob, "habitantes (municipio completo)", F_CONAPO, M_POB);
+      }
+    }
+  }
+
+  rows.push(["nota_metodologica",
+    "Estadísticas calculadas con datos abiertos (INEGI Censo 2020, Leyes de Ingresos 2026, IMPLAN). " +
+    "La población y viviendas se suman por AGEB completa (sin interpolación areal), por lo que la " +
+    "estimación incluye la población de las AGEBs parcialmente dentro del polígono.", "", "", ""]);
+
+  const csv = rows.map((r) => r.map(csvEscapeZona).join(",")).join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `zona-poligono_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportZonaJSON() {
+  if (!currentStats || !currentZone) return;
+  const s = currentStats;
+  const round0 = (n) => n == null ? null : Math.round(n);
+  const round1 = (n) => n == null ? null : Number(n.toFixed(1));
+  const round2 = (n) => n == null ? null : Number(n.toFixed(2));
+
+  const pduTotal = Object.values(s.pduShares || {}).reduce((a, b) => a + b, 0);
+  const pduUsos = {};
+  for (const [g, km2] of Object.entries(s.pduShares || {})) {
+    pduUsos[g] = { pct: round1(pduTotal > 0 ? (km2 / s.areaKm2) * 100 : 0) };
+  }
+  if (pduTotal > 0) {
+    pduUsos.sin_zonificacion_pct = round1(Math.max(0, 100 - pduTotal / s.areaKm2 * 100));
+  }
+
+  const colonias = (s.cols || []).map((c) => ({
+    nombre: `${c.TIPO !== "NINGUNO" ? c.TIPO + " " : ""}${c.NOM_ASEN}`,
+    municipio: c.municipio || null,
+    cp: c.CP || null,
+    valor_m2: c.valor_m2 ?? null,
+  }));
+
+  const nseDistribucion = {};
+  for (const [nivel, cnt] of Object.entries(s.nseCounts || {})) nseDistribucion[nivel] = cnt;
+  nseDistribucion.nivel_predominante = s.nivelPred || null;
+
+  const json = {
+    schema_version: 1,
+    tipo_analisis: "poligono_dibujado",
+    generado: new Date().toISOString(),
+    area_poligono_km2: round2(s.areaKm2),
+    agebs_intersectadas: s.nAgebs,
+    geojson_poligono: currentZone,
+    demografia: {
+      poblacion_total: round0(s.pop),
+      nse_score: round2(s.nseScore),
+      pct_viviendas_2mas_recamaras: round1(s.pct2dorm),
+      pct_viviendas_3mas_cuartos: round1(s.pct3cuart),
+    },
+    nse_distribucion: nseDistribucion,
+    catastral: s.catStats ? {
+      colonias_n: s.catStats.n,
+      min_m2: s.catStats.min,
+      promedio_m2: round0(s.catStats.avg),
+      mediana_m2: round0(s.catStats.med),
+      max_m2: s.catStats.max,
+      colonias,
+    } : { colonias_n: 0, colonias: [] },
+    zonas_mercado: (s.priceZones || []).map((z) => ({
+      zona: z.zona,
+      precio_m2_min: z.precio_m2_min,
+      precio_m2_max: z.precio_m2_max,
+    })),
+    pdu_usos: pduUsos,
+    poblacion_proyeccion_municipio: s.poblacionMunicipios ? {
+      fuente: s.poblacionMunicipios.fuente,
+      nota: s.poblacionMunicipios.nota,
+      municipios: Object.fromEntries(
+        Object.entries(s.poblacionMunicipios.municipios).map(([mun, v]) => [mun, {
+          serie: v.serie,
+          anio_comparacion_fin: v.anioComparacionFin,
+          cambio_2020_fin_pct: v.cambio2020FinPct,
+        }])),
+    } : null,
+    fuentes: [
+      "INEGI Censo 2020 (AGEB urbana) — demografía, vivienda, NSE",
+      "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040",
+      "Leyes de Ingresos 2026 de Aguascalientes y Jesús María — valor catastral de suelo",
+      "PDUCA 2040 ev.2 / PDU Ciudad de Jesús María 2015-2035 / PMDU Jesús María 2017-2040 — uso de suelo",
+      "Estudio de mercado de terceros, corte 1T26 — zonas de precio",
+    ],
+    advertencias: [
+      "La población se suma por AGEB completa (sin interpolación areal); las AGEBs parcialmente dentro " +
+      "del polígono se cuentan completas, por lo que la estimación puede sobreestimar la población real.",
+      "Estadísticas calculadas con datos abiertos. No es un avalúo ni conteo exacto.",
+    ],
+  };
+
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `zona-poligono_${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById("btn-csv").addEventListener("click", () => {
+  // El botón CSV es compartido: buffer.js lo reclama cuando hay análisis de radio;
+  // zona.js lo reclama cuando hay polígono dibujado.
+  if (!currentZone) return; // si hay buffer activo, buffer.js maneja el evento
+  exportZonaCSV();
+});
+
+document.getElementById("btn-json").addEventListener("click", () => {
+  if (!currentZone) return; // si hay buffer activo, buffer.js maneja el evento
+  exportZonaJSON();
 });
