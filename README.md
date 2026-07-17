@@ -329,7 +329,7 @@ retoma más adelante**.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install geopandas pandas xlrd
+.venv/bin/pip install geopandas pandas xlrd openpyxl scikit-learn pyproj
 # descargar y descomprimir los dos zips de INEGI en data/raw/ (ver URLs arriba):
 #   data/raw/mg/conjunto_de_datos/01a.shp   y   data/raw/iter/...csv
 # descargar de CONAPO en data/raw/conapo/:
