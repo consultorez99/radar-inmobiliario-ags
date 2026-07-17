@@ -239,7 +239,7 @@ function nsePopup(p) {
       <tr><td>Viviendas con auto</td><td>${p.pct_auto != null ? p.pct_auto + "%" : "s/d"}</td></tr>
       <tr><td>Ocupantes por cuarto</td><td>${p.PRO_OCUP_C != null ? p.PRO_OCUP_C : "s/d"}</td></tr>
     </table>
-    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación propia con Censo 2020 (INEGI). No es dato AMAI/Tinsa.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación propia con Censo 2020 (INEGI). No es dato AMAI ni de otro proveedor comercial.</div>`;
 }
 
 function pricePopup(p) {

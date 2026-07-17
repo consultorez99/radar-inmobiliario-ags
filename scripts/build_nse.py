@@ -21,7 +21,7 @@ Genera los datos del mapa de geozonas de Aguascalientes:
                                           build_poblacion_proyeccion)
 
 IMPORTANTE: el NSE aquí calculado es un PROXY PROPIO basado en datos abiertos.
-NO es el algoritmo oficial de AMAI ni los datos propietarios de Tinsa/RadarMX.
+NO es el algoritmo oficial de AMAI ni datos propietarios de terceros.
 La marginación de CONAPO sí es un índice oficial. Las zonas de precio son
 estimaciones de mercado (julio 2026), no valores catastrales ni avalúos.
 

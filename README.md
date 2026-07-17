@@ -50,7 +50,7 @@ Herramientas interactivas:
   contrastar hasta 4 colonias lado a lado.
 - Panel de capas, leyendas flotantes y modal "Acerca de".
 
-> ⚠️ **Proyecto independiente.** Sin afiliación con Tinsa, RadarMX ni AMAI.
+> ⚠️ **Proyecto independiente.** Sin afiliación con RadarMX, AMAI ni otros proveedores comerciales de datos.
 > Todo lo que muestra son **estimaciones construidas con datos abiertos**, no
 > avalúos oficiales ni el algoritmo propietario de NSE de AMAI.
 

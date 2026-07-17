@@ -24,7 +24,7 @@ function pdfFooter(doc, page, pages) {
   doc.setTextColor(110, 100, 130);
   doc.text(
     "Datos abiertos: INEGI (Censo 2020, Marco Geoestadístico, DCAH) · Leyes de Ingresos 2026 de Aguascalientes y Jesús María · " +
-    "IMPLAN (PDUCA 2040) · Estimaciones de mercado jul-2026. NO es un avalúo oficial. Proyecto independiente sin afiliación con Tinsa/RadarMX.",
+    "IMPLAN (PDUCA 2040) · Estimaciones de mercado jul-2026. NO es un avalúo oficial. Proyecto independiente, sin afiliación con terceros.",
     MARGIN, 288, { maxWidth: CONTENT_W });
   doc.text(`Página ${page} de ${pages}`, PAGE_W - MARGIN, 283, { align: "right" });
   doc.setTextColor(40, 40, 40);
