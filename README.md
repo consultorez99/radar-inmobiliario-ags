@@ -84,12 +84,15 @@ data/
   ags_catastral.json      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
   ags_pdu.json            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
   ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
+  ags_denue_proxy.json    # NSE estimado EXPERIMENTAL (Bajo/Medio/Alto) en 20 zonas sin AGEB 2020,
+                             # modelo calibrado con DENUE — no es dato censal, ver metodología en README abajo
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
 scripts/
   build_nse.py               # regenera agebs + price_zones desde los insumos
   build_catastral.py         # extrae el Anexo 1 de la Ley de Ingresos y lo cruza con colonias DCAH
   build_pdu.py               # convierte los webmaps ArcGIS de IMPLAN (Ags + Jesús María) a un solo GeoJSON
   build_poi.py               # consulta Overpass API y genera la capa de puntos de interés
+  build_denue_proxy.py       # calibra el modelo NSE-por-DENUE y genera la capa "Estimado" (ver metodología abajo)
   build_shf.py               # parsea el XLSX de datos abiertos del Índice SHF (descarga trimestral manual)
   geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
@@ -214,6 +217,48 @@ INEGI (`*`, `N/D`) se imputan al punto medio (0.5) de la variable normalizada.
 **Limitaciones:** es un proxy propio, no la regla AMAI (que usa variables del
 hogar, no agregados por AGEB); los cortes por percentil fuerzan una
 distribución relativa *dentro del municipio*; los datos censales son de 2020.
+
+## Metodología del NSE estimado en zonas sin AGEB (capa "Estimado", experimental)
+
+Los fraccionamientos construidos después del Censo 2020 no tienen polígono de
+AGEB — aparecen en blanco en la capa NSE aunque ya estén habitados. Esta capa
+intenta darles una estimación aproximada, cruzando el NSE conocido de las 373
+AGEBs con el directorio DENUE (INEGI):
+
+1. **Features por AGEB conocido**: para cada uno de los 373 AGEBs se cruzan
+   sus negocios DENUE (join espacial) y se calculan variables derivadas —
+   densidad de negocios/km², % por giro SCIAN agrupado (comercio básico,
+   alimentos/alojamiento, salud, educación, servicios profesionales/
+   financieros/inmobiliarios, industria, comercio mayoreo, esparcimiento) y
+   % de negocios con más de 30 empleados.
+2. **Modelo**: `GradientBoostingRegressor` (scikit-learn, 150 árboles,
+   profundidad 2) entrenado para predecir `nse_score` real a partir de esas
+   variables. Validado con 5-fold cross-validation (el modelo nunca ve el
+   AGEB que está prediciendo en cada fold): **R²=0.50, correlación=0.71**.
+   Traducido a 3 niveles (Bajo/Medio/Alto, terciles del score real): **62%
+   de acierto exacto**, **3% de error grave** (confundir Bajo con Alto).
+3. **Zonas sin AGEB**: los negocios DENUE que caen fuera de todo AGEB pero
+   dentro de una colonia catastral reconocida (zona urbanizada real, no
+   campo abierto) se agrupan por cercanía (`DBSCAN`, radio 180 m, mínimo 6
+   negocios) en clusters geográficos distintos — 26 en el corte actual.
+4. **Exclusión**: un cluster se excluye de la estimación (se muestra en gris,
+   "no estimado", con el motivo) si tiene menos de 8 negocios, si más de 35%
+   de su actividad es industrial/agropecuaria/minera (p. ej. una ladrillera
+   o una cartonera — no reflejan el NSE de futuros vecinos residenciales), o
+   si más de la mitad de sus negocios son del mismo giro con pocos casos.
+
+**Por qué solo 3 niveles y no los 7 de la capa censal**: con ~62% de acierto
+exacto, siete niveles daría una falsa sensación de precisión. Tres niveles,
+paleta de color distinta (morado) y borde punteado evitan que se confunda
+con un dato oficial.
+
+**Limitaciones**: es un modelo estadístico sobre ~370 AGEBs de entrenamiento,
+no una medición — trátese como orientación, no como dato duro. La mezcla de
+giros de negocio es una señal indirecta y ruidosa del NSE real; zonas con
+pocos negocios (aunque pasen el mínimo de 8) tienen más incertidumbre que
+zonas con cientos. Regenerar: `.venv/bin/python scripts/build_denue_proxy.py`
+(requiere `data/raw/denue/denue_01_csv.zip`, descarga trimestral manual de
+[INEGI](https://www.inegi.org.mx/app/descarga/?ti=6) → Aguascalientes → DENUE).
 
 ## Densidad y viviendas deshabitadas
 

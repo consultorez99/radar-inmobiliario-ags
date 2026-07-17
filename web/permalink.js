@@ -49,6 +49,7 @@ function plActualizar() {
     const ov = [];
     if (proyectosVisible) ov.push("proy");
     if (poiVisible) ov.push("poi");
+    if (denueProxyVisible) ov.push("denue");
     if (ov.length) partes.push(`ov=${ov.join(",")}`);
     const bs = window.getBufferStats?.();
     if (bs) {
@@ -78,6 +79,7 @@ window.plRestaurar = function () {
     const ov = p.ov.split(",");
     if (ov.includes("proy") && !proyectosVisible) document.getElementById("btn-proyectos").click();
     if (ov.includes("poi") && !poiVisible) document.getElementById("btn-poi").click();
+    if (ov.includes("denue") && !denueProxyVisible) document.getElementById("btn-denue").click();
   }
   if (p.buf) {
     const [lat, lng, r] = p.buf.split(",").map(Number);
@@ -101,6 +103,6 @@ window.plRestaurar = function () {
 
 map.on("moveend", plActualizar);
 map.on("zoomend", plActualizar);
-for (const id of ["btn-proyectos", "btn-poi"]) {
+for (const id of ["btn-proyectos", "btn-poi", "btn-denue"]) {
   document.getElementById(id).addEventListener("click", plActualizar);
 }
