@@ -132,7 +132,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 // GeoJSON crudos compartidos con zona.js / reporte.js
-const DATA = { agebs: null, zones: null, cat: null, pdu: null, poblacionProyeccion: null };
+const DATA = { agebs: null, zones: null, cat: null, pdu: null, poblacionProyeccion: null, shfIndice: null };
 
 let nseLayer = null;
 let priceLayer = null;
@@ -242,15 +242,33 @@ function nsePopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación propia con Censo 2020 (INEGI). No es dato AMAI ni de otro proveedor comercial.</div>`;
 }
 
+// Variación anual (%) del Índice SHF para una serie ("municipio_ags", etc.):
+// último trimestre disponible contra el mismo trimestre del año anterior.
+// Devuelve { pct, corte } o null si la serie no está cargada.
+function shfYoY(clave) {
+  const serie = DATA.shfIndice?.series?.find((s) => s.clave === clave);
+  if (!serie || serie.datos.length < 5) return null;
+  const [anio, trim, idx] = serie.datos[serie.datos.length - 1];
+  const previo = serie.datos.find((p) => p[0] === anio - 1 && p[1] === trim);
+  if (!previo) return null;
+  return { pct: (idx / previo[2] - 1) * 100, corte: `${trim}T${String(anio).slice(2)}` };
+}
+window.shfYoY = shfYoY;
+
 function pricePopup(p) {
+  const shf = shfYoY("municipio_ags");
+  const shfLinea = shf
+    ? `<tr><td>Apreciación anual</td><td>+${shf.pct.toFixed(1)}% <span style="font-size:10px;color:var(--muted)">(Índice SHF ${shf.corte}, mpio. Ags)</span></td></tr>`
+    : "";
   return `
     <div class="popup-title">Zona ${p.zona}</div>
     <table class="popup-table">
       <tr><td>Precio aprox.</td><td><strong>${fmtMXN(p.precio_m2_min)} – ${fmtMXN(p.precio_m2_max)} /m²</strong></td></tr>
       <tr><td>Plusvalía</td><td>${p.plusvalia || "—"}</td></tr>
+      ${shfLinea}
     </table>
     <div style="margin-top:4px;font-size:12px">${p.nota || ""}</div>
-    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación de mercado (jul 2026). No es valor catastral ni avalúo.</div>`;
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación de mercado (jul 2026). No es valor catastral ni avalúo. La apreciación anual es el dato oficial del Índice SHF (municipio completo, no por zona).</div>`;
 }
 
 function catPopup(p) {
@@ -364,6 +382,14 @@ async function loadData() {
     const proyResp = await fetch("../data/ags_poblacion_proyeccion.json");
     if (proyResp.ok) DATA.poblacionProyeccion = await proyResp.json();
   } catch (err) { console.warn("No se pudo cargar la proyección de población:", err); }
+
+  // Índice SHF de precios de la vivienda (trimestral 2005-hoy) — también de
+  // contexto, no crítico: alimenta la gráfica del panel Vivienda nueva y la
+  // referencia oficial en los popups de zonas de precio.
+  try {
+    const shfResp = await fetch("../data/ags_shf_indice.json");
+    if (shfResp.ok) DATA.shfIndice = await shfResp.json();
+  } catch (err) { console.warn("No se pudo cargar el índice SHF:", err); }
 
   nseLayer = L.geoJSON(agebs, {
     style: nseStyle,

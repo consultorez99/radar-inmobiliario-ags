@@ -119,6 +119,69 @@ const SOFTEC_MUNICIPIOS = [
 
 function fmtNum(n) { return Number(n).toLocaleString("es-MX"); }
 
+// ---- Índice SHF de precios (dato abierto oficial; DATA.shfIndice y shfYoY
+// viven en main.js). Complementa el estudio privado con serie larga 2005-hoy.
+let shfChartInstance = null;
+
+function shfSeccionHTML() {
+  if (!DATA.shfIndice) return "";
+  const chips = [
+    ["municipio_ags", "Aguascalientes (mpio.)"],
+    ["jesus_maria", "Jesús María"],
+    ["nacional", "Nacional"],
+  ].map(([clave, nombre]) => {
+    const y = shfYoY(clave);
+    if (!y) return "";
+    const signo = y.pct >= 0 ? "+" : "";
+    const flecha = y.pct >= 0 ? { s: "▲", col: "#1a9850" } : { s: "▼", col: "#d73027" };
+    return `<div class="softec-card"><span>${nombre}</span>
+      <strong>${signo}${y.pct.toFixed(1)}% <span style="color:${flecha.col}">${flecha.s}</span></strong></div>`;
+  }).join("");
+  return `
+    <h3>Evolución del precio de la vivienda — Índice SHF</h3>
+    <p class="softec-cobertura">Variación anual al corte ${DATA.shfIndice.corte} (Índice SHF de
+      Precios de la Vivienda, dato abierto oficial, base 2017=100). A diferencia del estudio de
+      mercado, esta serie cubre vivienda nueva y usada con crédito hipotecario, por municipio completo:</p>
+    <div class="softec-cards">${chips}</div>
+    <div class="softec-chart"><canvas id="chart-shf"></canvas></div>
+    <p class="softec-fuente" style="margin-top:4px">Fuente: Sociedad Hipotecaria Federal —
+      Índice SHF de Precios de la Vivienda en México, serie trimestral desde 2005 (Libre Uso MX).
+      El índice mide apreciación, no precio absoluto: un índice mayor no significa zona más cara,
+      sino mayor crecimiento acumulado desde 2017.</p>`;
+}
+
+function renderShfChart() {
+  const canvas = document.getElementById("chart-shf");
+  if (!canvas || !DATA.shfIndice) return;
+  if (shfChartInstance) { shfChartInstance.destroy(); shfChartInstance = null; }
+  const series = DATA.shfIndice.series;
+  const base = series.find((s) => s.clave === "municipio_ags");
+  const labels = base.datos.map(([a, t]) => `${t}T${String(a).slice(2)}`);
+  const ds = (clave, nombre, color, dash) => ({
+    label: nombre,
+    data: series.find((s) => s.clave === clave).datos.map((p) => p[2]),
+    borderColor: color, backgroundColor: color,
+    borderWidth: 2, pointRadius: 0, tension: 0.25, borderDash: dash || [],
+  });
+  shfChartInstance = new Chart(canvas, {
+    type: "line",
+    data: { labels, datasets: [
+      ds("municipio_ags", "Aguascalientes (mpio.)", "#2f6690"),
+      ds("jesus_maria", "Jesús María", "#2a9d8f"),
+      ds("nacional", "Nacional", "#9ca3af", [5, 4]),
+    ] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { autoSkip: true, maxTicksLimit: 11, font: { size: 9 } } },
+        y: { title: { display: true, text: "Índice (2017=100)", font: { size: 10 } }, ticks: { font: { size: 9 } } },
+      },
+    },
+  });
+}
+
 function softecFilaHTML(r) {
   return `<tr>
     <td>${r.nombre}</td>
@@ -178,6 +241,8 @@ function buildSoftecPanel() {
       </tr>`).join("")}
     </table></div>
 
+    ${shfSeccionHTML()}
+
     <h3>Calculadora de accesibilidad</h3>
     <p class="softec-cobertura">Estimación propia con fórmula estándar de amortización (no es la
       metodología del estudio). Elige un segmento de referencia para precargar valores reales, o
@@ -231,6 +296,7 @@ function buildSoftecPanel() {
     document.getElementById(id).addEventListener("input", calcularAccesibilidad);
   }
   calcularAccesibilidad();
+  renderShfChart();
 }
 
 const softecModal = document.getElementById("softec-modal");

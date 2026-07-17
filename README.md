@@ -74,6 +74,8 @@ data/
                              # conapo_im/conapo_grado/conapo_imn (marginación urbana, CONAPO)
   ags_price_zones.json    # 6 zonas: zona, precio_m2_min/max, plusvalia, nota
   ags_poblacion_proyeccion.json  # población por municipio 1990-2040 (CONAPO, histórico + proyección)
+  ags_shf_indice.json     # Índice SHF de precios de la vivienda, trimestral 1T2005-hoy (nacional,
+                             # estado, mpios. Aguascalientes y Jesús María; dato abierto Libre Uso MX)
   ags_catastral.json      # 783 colonias (611 Ags + 172 JM) con valor_m2 oficial 2026, sector/plano y CP
   ags_pdu.json            # 1,284 polígonos: 32 PDUCA 2040 (Ags) + 392 PDU ciudad JM + 860 PM municipal JM (recortado)
   ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
@@ -83,6 +85,7 @@ scripts/
   build_catastral.py         # extrae el Anexo 1 de la Ley de Ingresos y lo cruza con colonias DCAH
   build_pdu.py               # convierte los webmaps ArcGIS de IMPLAN (Ags + Jesús María) a un solo GeoJSON
   build_poi.py               # consulta Overpass API y genera la capa de puntos de interés
+  build_shf.py               # parsea el XLSX de datos abiertos del Índice SHF (descarga trimestral manual)
   geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
   index.html, styles.css
