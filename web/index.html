@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <header class="app-header">
@@ -55,6 +55,7 @@
 
   <div class="map-wrap">
     <div id="map"></div>
+    <div class="zoom-hint hidden" id="denue-neg-zoom-hint">Acércate para ver los negocios (zoom ≥ 15)</div>
 
     <!-- Panel de zona de estudio (aparece al dibujar un polígono) -->
     <aside class="zone-panel hidden" id="zone-panel">
@@ -157,6 +158,10 @@
       <button class="layer-btn" id="btn-poi" title="Puntos de interés: escuelas, salud, abasto, bancos, parques, gasolineras (superpuesto)">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M10 17.5S4 12 4 7.8a6 6 0 0 1 12 0C16 12 10 17.5 10 17.5z"/><circle cx="10" cy="7.7" r="2"/></svg></span>
         <span class="layer-label">POI</span>
+      </button>
+      <button class="layer-btn" id="btn-denue-neg" title="Directorio completo de negocios (DENUE, INEGI) — 57,931 puntos, filtrables por giro (superpuesto)">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><circle cx="6" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="13" cy="5" r="1.6" fill="currentColor" stroke="none"/><circle cx="9.5" cy="10" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="5" cy="14" r="1.6" fill="currentColor" stroke="none"/><circle cx="11.5" cy="16" r="1.6" fill="currentColor" stroke="none"/></svg></span>
+        <span class="layer-label">Negocios</span>
       </button>
       <button class="layer-btn" id="btn-denue" title="NSE estimado (experimental) en zonas nuevas sin AGEB 2020, a partir de negocios DENUE — no es dato censal">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20" stroke-dasharray="2.2,2"><rect x="3" y="3" width="14" height="14" rx="2"/><path stroke-dasharray="none" d="M7 13.5v-3l2-2 2 1.5 2-3.5"/></svg></span>
@@ -279,6 +284,19 @@
         <div class="legend-rows" id="legend-poi-rows"></div>
         <div class="legend-note">1,467 puntos de OpenStreetMap (escuelas, salud, abasto, bancos,
           parques, gasolineras). Desmarca una categoría para ocultarla. Dato abierto (ODbL).</div>
+      </div>
+    </div>
+    <div class="legend hidden" id="legend-denue-neg">
+      <div class="legend-title legend-drag-handle">
+        Negocios (DENUE)
+        <button class="legend-toggle-btn" title="Minimizar/Expandir" onclick="toggleLegend(this)">▼</button>
+      </div>
+      <div class="legend-body">
+        <div class="legend-rows" id="legend-denue-neg-rows"></div>
+        <div class="legend-note" id="legend-denue-neg-total">Cargando…</div>
+        <div class="legend-note">Desmarca una categoría para ocultarla. Solo visible a partir de
+          cierto zoom (a nivel ciudad serían 58 mil puntos amontonados, ilegible). Dato abierto
+          (Libre Uso MX), se actualiza cada semestre.</div>
       </div>
     </div>
     <div class="legend hidden" id="legend-denue">
@@ -435,6 +453,12 @@
         socioeconómico de futuros vecinos)— y se muestran en gris como "no estimado" en vez de
         forzarles un número. Polígono con borde punteado y paleta morada, para no confundirse
         nunca con la capa NSE real.</p>
+      <h3>Negocios (capa "Negocios")</h3>
+      <p>El directorio DENUE completo, sin modelo ni estimación: los 57,931 negocios activos en
+        Aguascalientes y Jesús María, con nombre, giro específico y tamaño (rango de empleados),
+        filtrables por 11 categorías. <strong>Dato abierto directo de INEGI</strong> — a diferencia
+        de la capa "Estimado", aquí no hay nada inferido. Solo se muestra a partir de cierto zoom:
+        a nivel ciudad serían 58 mil puntos amontonados encima unos de otros, no información útil.</p>
       <h3>Fuentes</h3>
       <ul>
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
@@ -472,7 +496,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=11"></script>
+  <script src="main.js?v=13"></script>
   <script src="zona.js?v=7"></script>
   <script src="reporte.js?v=6"></script>
   <script src="softec.js?v=3"></script>
@@ -480,11 +504,12 @@
   <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=4"></script>
   <script src="denue_proxy.js?v=1"></script>
+  <script src="denue_negocios.js?v=1"></script>
   <script src="trafico.js?v=5"></script>
   <script src="buffer-core.js?v=1"></script>
   <script src="buffer.js?v=5"></script>
   <!-- al final: lee/escribe estado de main, zona, buffer, poi y proyectos -->
-  <script src="permalink.js?v=2"></script>
+  <script src="permalink.js?v=5"></script>
 
   <script>
     /* ---- Minimizar / Expandir leyenda ---- */
