@@ -210,7 +210,9 @@ function runBufferAnalysis(lat, lng, radiusKm, { fit = true } = {}) {
     return;
   }
   stopBufferPicking();
-  // el panel muestra un análisis a la vez: quitar el polígono dibujado si lo hay
+  // el panel muestra un análisis a la vez: quitar el polígono dibujado y las
+  // isócronas si las hay
+  window.clearIsocronas?.();
   drawnItems.clearLayers();
   currentZone = null;
   currentStats = null;
@@ -277,7 +279,8 @@ btnBuffer.addEventListener("click", () => {
     return;
   }
   btnBuffer.classList.add("active");
-  // quitar el polígono dibujado: el panel muestra un análisis a la vez
+  // quitar el polígono dibujado y las isócronas: el panel muestra un análisis a la vez
+  window.clearIsocronas?.();
   drawnItems.clearLayers();
   currentZone = null;
   currentStats = null;

@@ -356,6 +356,12 @@ function layerClick(e) {
     window.onBufferMapClick({ latlng: e.latlng });
     return;
   }
+  if (window.isoPicking) {
+    L.DomEvent.stopPropagation(e);
+    map.closePopup();
+    window.onIsoMapClick({ latlng: e.latlng });
+    return;
+  }
 }
 
 // ------------------------------------------------------------ carga de datos

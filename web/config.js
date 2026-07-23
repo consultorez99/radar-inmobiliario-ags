@@ -15,3 +15,20 @@
 "use strict";
 
 const TOMTOM_API_KEY = "nCONdLiT2PF3t0aaB9TdbevIqBis8QAZ";
+
+/* ORS_API_KEY: clave del panel de OpenRouteService
+ * (https://openrouteservice.org/dev/#/signup — plan gratuito: 500 isócronas/día,
+ * 20/min). Alimenta la capa "Isócronas" (área alcanzable por tiempo de traslado
+ * en auto o a pie, sobre la red vial de OpenStreetMap).
+ *
+ * TomTom NO sirve para esto: su endpoint "Reachable Range" es solo motorizado y
+ * rechaza el modo a pie. Por eso las isócronas usan OpenRouteService, que sí
+ * hace auto y a pie (y bici) y devuelve las tres bandas en una sola llamada.
+ *
+ * NOTA: al ser una app 100% estática, esta clave viaja al navegador y es visible
+ * para cualquiera que inspeccione el sitio (igual que la de TomTom). ORS no
+ * permite restringir por dominio, así que la protección real es la cuota diaria
+ * y vigilar el consumo en el dashboard de ORS. Si se deja vacía, el botón
+ * Isócronas explica cómo obtener la clave en lugar de fallar.
+ */
+const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImQwYTg2MjM5ODIyMDQyZmM4MjNkNzQyOGM0ZWExODNhIiwiaCI6Im11cm11cjY0In0=";

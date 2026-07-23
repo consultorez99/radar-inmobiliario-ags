@@ -5,6 +5,7 @@
  *   &capa=pdu                 capa exclusiva activa (omitida si es NSE, "no" si ninguna)
  *   &ov=proy,poi              capas superpuestas encendidas
  *   &buf=LAT,LNG,R            análisis de radio (km)
+ *   &iso=LAT,LNG,MODO         isócronas (MODO = car | pedestrian; excluyente con buf/pol)
  *   &pol=LAT,LNG;LAT,LNG;...  polígono dibujado (excluyente con buf)
  *
  * Se actualiza en vivo con history.replaceState (sin ensuciar el historial) y
@@ -53,8 +54,11 @@ function plActualizar() {
     if (denueNegVisible) ov.push("negdenue");
     if (ov.length) partes.push(`ov=${ov.join(",")}`);
     const bs = window.getBufferStats?.();
+    const is = window.getIsoState?.();
     if (bs) {
       partes.push(`buf=${bs.lat.toFixed(5)},${bs.lng.toFixed(5)},${bs.radiusKm}`);
+    } else if (is) {
+      partes.push(`iso=${is.lat.toFixed(5)},${is.lng.toFixed(5)},${is.mode}`);
     } else if (currentZone) {
       // GeoJSON repite el primer vértice al final: se omite. Un polígono con
       // demasiados vértices haría una URL impráctica — se comparte sin él.
@@ -87,6 +91,12 @@ window.plRestaurar = function () {
     const [lat, lng, r] = p.buf.split(",").map(Number);
     if ([lat, lng, r].every(Number.isFinite) && r > 0 && r <= 20) {
       runBufferAnalysis(lat, lng, r, { fit: !p.map }); // con map= se respeta la vista compartida
+    }
+  } else if (p.iso) {
+    const [latStr, lngStr, modo] = p.iso.split(",");
+    const lat = Number(latStr), lng = Number(lngStr);
+    if ([lat, lng].every(Number.isFinite) && ISO_MODES[modo]) {
+      runIsocronas(lat, lng, modo, { fit: !p.map }); // con map= se respeta la vista compartida
     }
   } else if (p.pol) {
     const pts = p.pol.split(";")

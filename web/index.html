@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
   <header class="app-header">
@@ -85,6 +85,17 @@
       </button>
       <div class="zone-note">Estadísticas calculadas con datos abiertos (INEGI, Leyes de
         Ingresos 2026, IMPLAN). No es un avalúo.</div>
+    </aside>
+
+    <!-- Panel de isócronas (aparece al elegir un punto de análisis por tiempo) -->
+    <aside class="zone-panel iso-panel hidden" id="iso-panel">
+      <div class="zone-head">
+        <h2>Isócronas</h2>
+        <button id="iso-close" title="Quitar isócronas">✕</button>
+      </div>
+      <div id="iso-stats"></div>
+      <div class="zone-note">Tiempos de traslado sobre la red vial de OpenStreetMap (OpenRouteService).
+        Aproximados, sin tráfico en vivo — útiles para comparar conectividad entre puntos, no como ETA exacto.</div>
     </aside>
 
     <!-- Comparador de colonias -->
@@ -150,6 +161,10 @@
       <button class="layer-btn" id="btn-buffer" title="Análisis de zona de influencia: elige un punto (clic en el mapa o coordenadas) y un radio de 1 a 5 km">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none"/><line x1="10" y1="10" x2="14.8" y2="5.2"/></svg></span>
         <span class="layer-label">Radio</span>
+      </button>
+      <button class="layer-btn" id="btn-iso" title="Isócronas: área alcanzable por tiempo de traslado (auto o a pie) desde un punto — 5, 10 y 15 min sobre la red vial real">
+        <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M3 12.5C3 8 6 5 10 5s7 3 7 7c0 1.6-1 3-2.5 3.6"/><circle cx="10" cy="11" r="3.6"/><path d="M10 9.2v1.8l1.3 1"/></svg></span>
+        <span class="layer-label">Isócronas</span>
       </button>
       <button class="layer-btn" id="btn-proyectos" title="Proyectos de vivienda nueva (superpuesto, independiente de la capa activa)">
         <span class="layer-icon"><svg class="icon" viewBox="0 0 20 20"><path d="M3 10.5 7 7l4 3.5"/><path d="M4 10v6h6v-6"/><path d="M11.5 12 14.5 9.5 17.5 12"/><path d="M12.3 12v4.5h4.5V12"/></svg></span>
@@ -459,6 +474,14 @@
         filtrables por 11 categorías. <strong>Dato abierto directo de INEGI</strong> — a diferencia
         de la capa "Estimado", aquí no hay nada inferido. Solo se muestra a partir de cierto zoom:
         a nivel ciudad serían 58 mil puntos amontonados encima unos de otros, no información útil.</p>
+      <h3>Isócronas (análisis "Isócronas")</h3>
+      <p>Área alcanzable por <strong>tiempo de traslado</strong> desde un punto (clic en el mapa o
+        coordenadas), en tres bandas de 5, 10 y 15 minutos, en auto o a pie. A diferencia del
+        análisis de Radio —un círculo geométrico—, el contorno sigue la <strong>red vial real</strong>
+        de OpenStreetMap, calculado con el motor de ruteo abierto de <em>OpenRouteService</em>. Sirve
+        para demostrar conectividad: qué tan lejos se llega en X minutos y qué servicios (POIs) y
+        proyectos de vivienda nueva quedan dentro de ese tiempo. Los tiempos son estimaciones sin
+        tráfico en vivo (útiles para comparar puntos entre sí, no como hora de llegada exacta).</p>
       <h3>Fuentes</h3>
       <ul>
         <li>INEGI — Marco Geoestadístico (Censo 2020), capa AGEB urbana.</li>
@@ -469,6 +492,8 @@
         <li>SEGUOT — Programa de Desarrollo Urbano de la Ciudad de Jesús María 2015-2035 y
           Programa Municipal de Desarrollo Urbano de Jesús María 2017-2040, visores ArcGIS Online.</li>
         <li>OpenStreetMap contributors — Puntos de interés (ODbL), vía Overpass API.</li>
+        <li>OpenRouteService — motor de ruteo abierto sobre datos de OpenStreetMap; alimenta las
+          isócronas (área alcanzable por tiempo de traslado).</li>
         <li>INEGI — Directorio Estadístico Nacional de Unidades Económicas (DENUE), datos abiertos
           (Libre Uso). Insumo de la estimación experimental de NSE en zonas sin AGEB — el modelo
           y su validación son propios, no de INEGI.</li>
@@ -496,20 +521,21 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
-  <script src="main.js?v=13"></script>
-  <script src="zona.js?v=7"></script>
+  <script src="main.js?v=14"></script>
+  <script src="zona.js?v=8"></script>
   <script src="reporte.js?v=6"></script>
   <script src="softec.js?v=3"></script>
-  <script src="config.js?v=1"></script>
+  <script src="config.js?v=2"></script>
   <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=4"></script>
   <script src="denue_proxy.js?v=1"></script>
   <script src="denue_negocios.js?v=1"></script>
   <script src="trafico.js?v=5"></script>
   <script src="buffer-core.js?v=1"></script>
-  <script src="buffer.js?v=5"></script>
-  <!-- al final: lee/escribe estado de main, zona, buffer, poi y proyectos -->
-  <script src="permalink.js?v=5"></script>
+  <script src="buffer.js?v=6"></script>
+  <script src="isocronas.js?v=2"></script>
+  <!-- al final: lee/escribe estado de main, zona, buffer, isócronas, poi y proyectos -->
+  <script src="permalink.js?v=6"></script>
 
   <script>
     /* ---- Minimizar / Expandir leyenda ---- */

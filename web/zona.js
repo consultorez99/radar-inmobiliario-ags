@@ -61,8 +61,9 @@ function setZone(polygon) {
       .catch((err) => alert(err.message));
     return;
   }
-  // el panel muestra un análisis a la vez: quitar el buffer si lo hay
+  // el panel muestra un análisis a la vez: quitar el buffer y las isócronas si los hay
   window.clearBufferAnalysis?.(false);
+  window.clearIsocronas?.();
   currentZone = polygon;
   currentStats = analyzeZone(polygon);
   renderZonePanel(currentStats);
