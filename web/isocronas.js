@@ -49,6 +49,11 @@ const ISO_COLORS = ["#2a9d8f", "#e9c46a", "#e76f51"]; // banda cercana / media /
 // Solo aplica a Auto (TomTom); el modo A pie (ORS) no lo necesita.
 const ISO_CAR_CALIBRATION = 1.25;
 
+// Suavizado del contorno: el borde crudo de ambos motores sigue cada vía y se ve
+// muy "picudo". Se redondea con Chaikin (corta esquinas hacia adentro); no
+// cambia el alcance, solo lo hace ver orgánico. Más iteraciones = más redondo.
+const ISO_SMOOTH_ITER = 4;
+
 // Bandas de tiempo AJUSTABLES: el usuario elige el tiempo de la banda exterior
 // (isoMaxMin) con el slider del panel; las tres bandas son sus tercios. Con
 // paso de 3 min los tercios siempre son enteros (15 -> 5/10/15, 9 -> 3/6/9,
@@ -140,6 +145,40 @@ async function isoFetchBands(lat, lng, profile, minutes) {
   return feats; // Features<Polygon|MultiPolygon> ascendentes por tiempo
 }
 
+// -------------------------------------------------------------- suavizado
+// Chaikin sobre un anillo cerrado: cada arista se parte en dos puntos (1/4 y
+// 3/4), redondeando las esquinas. El anillo entra y sale cerrado (primer punto
+// repetido al final).
+function isoChaikinRing(ring, iterations) {
+  let pts = ring.slice(0, -1); // quitar el vértice de cierre duplicado
+  if (pts.length < 3) return ring;
+  for (let it = 0; it < iterations; it++) {
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      out.push([p[0] * 0.75 + q[0] * 0.25, p[1] * 0.75 + q[1] * 0.25]);
+      out.push([p[0] * 0.25 + q[0] * 0.75, p[1] * 0.25 + q[1] * 0.75]);
+    }
+    pts = out;
+  }
+  pts.push(pts[0]); // re-cerrar
+  return pts;
+}
+
+// Suaviza un Feature Polygon o MultiPolygon (todos sus anillos).
+function isoSmoothPoly(feat, iterations) {
+  const g = feat.geometry;
+  try {
+    if (g.type === "Polygon") {
+      return turf.polygon(g.coordinates.map((r) => isoChaikinRing(r, iterations)));
+    }
+    if (g.type === "MultiPolygon") {
+      return turf.multiPolygon(g.coordinates.map((poly) => poly.map((r) => isoChaikinRing(r, iterations))));
+    }
+  } catch (e) { /* geometría rara: devolver el original sin suavizar */ }
+  return feat;
+}
+
 // --------------------------------------------------------------- análisis
 async function analyzeIso(lat, lng, mode, minutes) {
   const key = `${lat.toFixed(6)}|${lng.toFixed(6)}|${mode}|${minutes.join(",")}`;
@@ -148,9 +187,13 @@ async function analyzeIso(lat, lng, mode, minutes) {
   // polys[i] = área alcanzable en minutes[i] min (anidadas: P0 ⊂ P1 ⊂ P2).
   // El motor depende del modo: Auto -> TomTom (con tráfico), A pie -> ORS.
   const cfg = ISO_MODES[mode];
-  const polys = cfg.engine === "tomtom"
+  const raw = cfg.engine === "tomtom"
     ? await isoFetchTomtomBands(lat, lng, cfg.tomtom, minutes)
     : await isoFetchBands(lat, lng, cfg.ors, minutes);
+  // Suavizar el contorno crudo (se ve muy "picudo" siguiendo cada vía). Se usa
+  // el suavizado para dibujar y para contar, así lo que se ve y lo que se cuenta
+  // coinciden.
+  const polys = raw.map((p) => isoSmoothPoly(p, ISO_SMOOTH_ITER));
 
   // Bandas disjuntas para dibujar (anillo = polígono menos el interior) — así
   // los colores no se suman al traslaparse. Si turf.difference falla, se usa
