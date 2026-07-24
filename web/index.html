@@ -26,7 +26,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
   <header class="app-header">
@@ -94,8 +94,9 @@
         <button id="iso-close" title="Quitar isócronas">✕</button>
       </div>
       <div id="iso-stats"></div>
-      <div class="zone-note">Tiempos de traslado sobre la red vial real (auto con TomTom y tráfico típico,
-        a pie con OpenRouteService). Aproximados — útiles para comparar conectividad entre puntos, no como ETA exacto.</div>
+      <div class="zone-note">Tiempos de traslado sobre la red vial real (auto con TomTom, calibrado contra
+        Google Maps para Aguascalientes; a pie con OpenRouteService). Aproximados — para comparar conectividad
+        entre puntos, no como ETA exacto.</div>
     </aside>
 
     <!-- Comparador de colonias -->
@@ -476,11 +477,14 @@
         a nivel ciudad serían 58 mil puntos amontonados encima unos de otros, no información útil.</p>
       <h3>Isócronas (análisis "Isócronas")</h3>
       <p>Área alcanzable por <strong>tiempo de traslado</strong> desde un punto (clic en el mapa o
-        coordenadas), en tres bandas de 5, 10 y 15 minutos, en auto o a pie. A diferencia del
+        coordenadas), en tres bandas de tiempo ajustables (5/10/15 min por defecto, configurables con
+        un control), en auto o a pie. A diferencia del
         análisis de Radio —un círculo geométrico—, el contorno sigue la <strong>red vial real</strong>.
-        El modo <em>Auto</em> se calcula con <em>TomTom</em> (usa condiciones de tráfico típicas, por eso
-        las áreas son realistas y no de velocidad libre); el modo <em>A pie</em>, con <em>OpenRouteService</em>
-        sobre datos de OpenStreetMap (TomTom no hace caminata). Sirve
+        El modo <em>Auto</em> se calcula con <em>TomTom</em> (usa condiciones de tráfico típicas) y además
+        se <strong>calibra contra Google Maps</strong>: en pruebas desde el centro, los bordes de la banda de
+        15 min tardaban ~18-19 min reales según Google, así que se aplica un factor de ~1.25 para que cada
+        banda refleje minutos reales de manejo en Aguascalientes. El modo <em>A pie</em> usa
+        <em>OpenRouteService</em> sobre datos de OpenStreetMap (TomTom no hace caminata). Sirve
         para demostrar conectividad: qué tan lejos se llega en X minutos y qué servicios (POIs) y
         proyectos de vivienda nueva quedan dentro de ese tiempo. Los tiempos son estimaciones sin
         tráfico en vivo (útiles para comparar puntos entre sí, no como hora de llegada exacta).</p>
@@ -535,9 +539,9 @@
   <script src="trafico.js?v=5"></script>
   <script src="buffer-core.js?v=1"></script>
   <script src="buffer.js?v=6"></script>
-  <script src="isocronas.js?v=3"></script>
+  <script src="isocronas.js?v=5"></script>
   <!-- al final: lee/escribe estado de main, zona, buffer, isócronas, poi y proyectos -->
-  <script src="permalink.js?v=6"></script>
+  <script src="permalink.js?v=7"></script>
 
   <script>
     /* ---- Minimizar / Expandir leyenda ---- */

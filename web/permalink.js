@@ -5,7 +5,7 @@
  *   &capa=pdu                 capa exclusiva activa (omitida si es NSE, "no" si ninguna)
  *   &ov=proy,poi              capas superpuestas encendidas
  *   &buf=LAT,LNG,R            análisis de radio (km)
- *   &iso=LAT,LNG,MODO         isócronas (MODO = car | pedestrian; excluyente con buf/pol)
+ *   &iso=LAT,LNG,MODO,MAX     isócronas (MODO=car|pedestrian; MAX=min de la banda exterior; excluyente con buf/pol)
  *   &pol=LAT,LNG;LAT,LNG;...  polígono dibujado (excluyente con buf)
  *
  * Se actualiza en vivo con history.replaceState (sin ensuciar el historial) y
@@ -58,7 +58,8 @@ function plActualizar() {
     if (bs) {
       partes.push(`buf=${bs.lat.toFixed(5)},${bs.lng.toFixed(5)},${bs.radiusKm}`);
     } else if (is) {
-      partes.push(`iso=${is.lat.toFixed(5)},${is.lng.toFixed(5)},${is.mode}`);
+      const maxMin = is.minutes[is.minutes.length - 1];
+      partes.push(`iso=${is.lat.toFixed(5)},${is.lng.toFixed(5)},${is.mode},${maxMin}`);
     } else if (currentZone) {
       // GeoJSON repite el primer vértice al final: se omite. Un polígono con
       // demasiados vértices haría una URL impráctica — se comparte sin él.
@@ -93,9 +94,10 @@ window.plRestaurar = function () {
       runBufferAnalysis(lat, lng, r, { fit: !p.map }); // con map= se respeta la vista compartida
     }
   } else if (p.iso) {
-    const [latStr, lngStr, modo] = p.iso.split(",");
-    const lat = Number(latStr), lng = Number(lngStr);
+    const [latStr, lngStr, modo, maxStr] = p.iso.split(",");
+    const lat = Number(latStr), lng = Number(lngStr), maxMin = Number(maxStr);
     if ([lat, lng].every(Number.isFinite) && ISO_MODES[modo]) {
+      if (Number.isFinite(maxMin) && maxMin >= 3 && maxMin <= 30) isoMaxMin = maxMin;
       runIsocronas(lat, lng, modo, { fit: !p.map }); // con map= se respeta la vista compartida
     }
   } else if (p.pol) {

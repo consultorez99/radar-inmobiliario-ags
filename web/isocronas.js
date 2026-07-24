@@ -1,7 +1,7 @@
 /* Isócronas: áreas alcanzables por tiempo de traslado desde un punto (clic en
- * el mapa o lat/lng manual), en tres bandas (5/10/15 min) por modo (Auto o A
- * pie). Sirve para demostrar conectividad: qué tan lejos se llega en X minutos
- * y qué se alcanza dentro de ese tiempo.
+ * el mapa o lat/lng manual), en tres bandas de tiempo ajustables (5/10/15 min
+ * por defecto) por modo (Auto o A pie). Sirve para demostrar conectividad: qué
+ * tan lejos se llega en X minutos y qué se alcanza dentro de ese tiempo.
  *
  * A diferencia del análisis de Radio (buffer.js), que traza un círculo
  * geométrico con turf, aquí el contorno sigue la red vial real. Como el sitio
@@ -32,14 +32,36 @@
 
 "use strict";
 
-const ISO_MINUTES = [5, 10, 15]; // bandas de tiempo (min)
 const ISO_MODES = {
   car:        { label: "Auto",  engine: "tomtom", tomtom: "car" },
   pedestrian: { label: "A pie", engine: "ors",    ors: "foot-walking" },
   // Para habilitar bici (ORS): cycling: { label: "Bici", engine: "ors", ors: "cycling-regular" }
 };
 // Paleta tipo semáforo suave: verde = cerca en tiempo, rojo = lejos.
-const ISO_COLORS = ["#2a9d8f", "#e9c46a", "#e76f51"]; // 5 / 10 / 15 min
+const ISO_COLORS = ["#2a9d8f", "#e9c46a", "#e76f51"]; // banda cercana / media / lejana
+
+// Calibración del modo Auto contra Google Maps (jul 2026). El "Reachable Range"
+// de TomTom es más optimista que la realidad: sus puntos de borde a "15 min"
+// tardaban en promedio ~18.5 min según Google (medido en 4 direcciones desde el
+// centro: N 18, Pte 19, Sur 19, Ote 18). O sea sobreestima el alcance ~1.23×.
+// Para corregirlo se le pide a TomTom un presupuesto de tiempo dividido por este
+// factor, de modo que la banda de "N min" refleje N minutos reales de manejo.
+// Solo aplica a Auto (TomTom); el modo A pie (ORS) no lo necesita.
+const ISO_CAR_CALIBRATION = 1.25;
+
+// Bandas de tiempo AJUSTABLES: el usuario elige el tiempo de la banda exterior
+// (isoMaxMin) con el slider del panel; las tres bandas son sus tercios. Con
+// paso de 3 min los tercios siempre son enteros (15 -> 5/10/15, 9 -> 3/6/9,
+// 30 -> 10/20/30). El modelo de ruteo sobreestima la velocidad para el gusto
+// local, así que bajar este valor es la forma de calibrar a la realidad de la
+// ciudad.
+const ISO_MIN_MIN = 3;
+const ISO_MAX_MIN = 30;
+const ISO_STEP_MIN = 3;
+let isoMaxMin = 15; // banda exterior seleccionada (min)
+function isoBands() {
+  return [isoMaxMin / 3, (isoMaxMin * 2) / 3, isoMaxMin].map((m) => Math.round(m));
+}
 
 let isoMode = "car";       // modo seleccionado
 let isoState = null;       // análisis activo (null = sin isócronas)
@@ -61,7 +83,8 @@ async function isoFetchTomtom(lat, lng, travelMode, minutes) {
     new URLSearchParams({
       key: TOMTOM_API_KEY,
       travelMode,
-      timeBudgetInSec: String(minutes * 60),
+      // presupuesto calibrado contra Google (ver ISO_CAR_CALIBRATION)
+      timeBudgetInSec: String(Math.round((minutes * 60) / ISO_CAR_CALIBRATION)),
     });
   const resp = await fetch(url);
   if (!resp.ok) {
@@ -82,21 +105,21 @@ async function isoFetchTomtom(lat, lng, travelMode, minutes) {
 }
 
 // Las tres bandas por TomTom, en paralelo (una llamada cada una).
-function isoFetchTomtomBands(lat, lng, travelMode) {
-  return Promise.all(ISO_MINUTES.map((m) => isoFetchTomtom(lat, lng, travelMode, m)));
+function isoFetchTomtomBands(lat, lng, travelMode, minutes) {
+  return Promise.all(minutes.map((m) => isoFetchTomtom(lat, lng, travelMode, m)));
 }
 
 // ------------------------------------------------------- OpenRouteService
 // Las tres bandas (polígonos turf) en una sola llamada. ORS devuelve un
 // Feature por cada valor de `range`; cada uno es el área COMPLETA alcanzable
 // en ese tiempo (anidados: P5 ⊂ P10 ⊂ P15).
-async function isoFetchBands(lat, lng, profile) {
+async function isoFetchBands(lat, lng, profile, minutes) {
   const resp = await fetch(`https://api.openrouteservice.org/v2/isochrones/${profile}`, {
     method: "POST",
     headers: { "Authorization": ORS_API_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({
       locations: [[lng, lat]],
-      range: ISO_MINUTES.map((m) => m * 60), // segundos
+      range: minutes.map((m) => m * 60), // segundos
       range_type: "time",
     }),
   });
@@ -111,28 +134,28 @@ async function isoFetchBands(lat, lng, profile) {
   const gj = await resp.json();
   const feats = (gj.features || []).slice()
     .sort((a, b) => (a.properties?.value || 0) - (b.properties?.value || 0));
-  if (feats.length < ISO_MINUTES.length) {
+  if (feats.length < minutes.length) {
     throw new Error("OpenRouteService no devolvió todas las bandas para este punto.");
   }
   return feats; // Features<Polygon|MultiPolygon> ascendentes por tiempo
 }
 
 // --------------------------------------------------------------- análisis
-async function analyzeIso(lat, lng, mode) {
-  const key = `${lat.toFixed(6)}|${lng.toFixed(6)}|${mode}`;
+async function analyzeIso(lat, lng, mode, minutes) {
+  const key = `${lat.toFixed(6)}|${lng.toFixed(6)}|${mode}|${minutes.join(",")}`;
   if (isoCache.has(key)) return isoCache.get(key);
 
-  // polys[i] = área alcanzable en ISO_MINUTES[i] min (anidadas: P5 ⊂ P10 ⊂ P15).
+  // polys[i] = área alcanzable en minutes[i] min (anidadas: P0 ⊂ P1 ⊂ P2).
   // El motor depende del modo: Auto -> TomTom (con tráfico), A pie -> ORS.
   const cfg = ISO_MODES[mode];
   const polys = cfg.engine === "tomtom"
-    ? await isoFetchTomtomBands(lat, lng, cfg.tomtom)
-    : await isoFetchBands(lat, lng, cfg.ors);
+    ? await isoFetchTomtomBands(lat, lng, cfg.tomtom, minutes)
+    : await isoFetchBands(lat, lng, cfg.ors, minutes);
 
   // Bandas disjuntas para dibujar (anillo = polígono menos el interior) — así
   // los colores no se suman al traslaparse. Si turf.difference falla, se usa
   // el polígono completo (se verá el traslape, pero no rompe).
-  const bands = ISO_MINUTES.map((min, i) => {
+  const bands = minutes.map((min, i) => {
     let display = polys[i];
     if (i > 0) {
       try {
@@ -143,8 +166,8 @@ async function analyzeIso(lat, lng, mode) {
     return { min, color: ISO_COLORS[i], display, full: polys[i], areaKm2: turf.area(polys[i]) / 1e6 };
   });
 
-  const reach = analyzeReach(polys);
-  const state = { lat, lng, mode, bands, reach };
+  const reach = analyzeReach(polys, minutes);
+  const state = { lat, lng, mode, minutes, bands, reach };
   isoCache.set(key, state);
   if (isoCache.size > 20) isoCache.delete(isoCache.keys().next().value);
   return state;
@@ -156,25 +179,25 @@ function isoPointInPoly(lng, lat, poly) {
 }
 
 // Conectividad: qué se alcanza dentro de cada banda (conteos acumulados).
-function analyzeReach(polys) {
+function analyzeReach(polys, minutes) {
   // Índice de la banda más chica que contiene el punto (-1 = fuera de todo).
   const bandIndexFor = (lng, lat) => {
     for (let i = 0; i < polys.length; i++) if (isoPointInPoly(lng, lat, polys[i])) return i;
     return -1;
   };
 
-  // POIs por categoría: [dentro de 5, dentro de 10, dentro de 15] acumulado.
+  // POIs por categoría: conteo acumulado por banda [≤b0, ≤b1, ≤b2].
   const poi = {};
   const poisDisponibles = !!DATA.poi;
   if (poisDisponibles) {
-    for (const cat of Object.keys(POI_ESTILO)) poi[cat] = [0, 0, 0];
+    for (const cat of Object.keys(POI_ESTILO)) poi[cat] = polys.map(() => 0);
     for (const f of DATA.poi.features) {
       const [lng, lat] = f.geometry.coordinates;
       const bi = bandIndexFor(lng, lat);
       if (bi < 0) continue;
       const cat = f.properties.categoria;
       if (!poi[cat]) continue;
-      for (let i = bi; i < ISO_MINUTES.length; i++) poi[cat][i]++;
+      for (let i = bi; i < polys.length; i++) poi[cat][i]++;
     }
   }
 
@@ -183,7 +206,7 @@ function analyzeReach(polys) {
   for (const p of PROYECTOS_SOFTEC) {
     const bi = bandIndexFor(p.lon, p.lat);
     if (bi < 0) continue;
-    proyectos.push({ nombre: p.nombre, tipo: p.tipo, minutos: ISO_MINUTES[bi] });
+    proyectos.push({ nombre: p.nombre, tipo: p.tipo, minutos: minutes[bi] });
   }
   proyectos.sort((a, b) => a.minutos - b.minutos || a.nombre.localeCompare(b.nombre));
 
@@ -247,11 +270,12 @@ function runIsocronas(lat, lng, mode, { fit = true } = {}) {
   document.getElementById("zone-panel").classList.add("hidden");
 
   isoMode = mode;
+  const minutes = isoBands();
   const btn = document.getElementById("btn-iso");
   btn.classList.add("active", "loading");
   renderIsoPanel(isoState, { loading: true });
 
-  analyzeIso(lat, lng, mode)
+  analyzeIso(lat, lng, mode, minutes)
     .then((state) => {
       isoState = state;
       drawIso(state);
@@ -340,7 +364,16 @@ function isoFormHTML(s) {
         <label>Lng <input id="iso-lng" type="number" step="any" placeholder="-102.2916" value="${lng}"></label>
         <button id="iso-go" title="Calcular isócronas">Calcular</button>
       </div>
-      ${s ? "" : `<div class="bf-hint">Haz clic en el mapa para elegir el punto, o escribe las coordenadas. Se dibujan las bandas de 5, 10 y 15 minutos.</div>`}
+      <div class="bf-slider-wrap">
+        <div class="bf-slider-header">
+          <span class="bf-slider-label">Tiempo máx.</span>
+          <span class="bf-slider-value" id="iso-max-val">${isoMaxMin} min · bandas ${isoBands().join("/")}</span>
+        </div>
+        <input class="bf-slider iso-slider" id="iso-max" type="range"
+               min="${ISO_MIN_MIN}" max="${ISO_MAX_MIN}" step="${ISO_STEP_MIN}" value="${isoMaxMin}">
+        <div class="bf-slider-ticks"><span>3</span><span>9</span><span>15</span><span>21</span><span>30 min</span></div>
+      </div>
+      ${s ? "" : `<div class="bf-hint">Haz clic en el mapa para elegir el punto, o escribe las coordenadas. Ajusta el tiempo con el control: baja los minutos si el alcance se ve optimista para el tráfico real.</div>`}
     </div>`;
 }
 
@@ -363,10 +396,11 @@ function isoResultsHTML(s) {
       .map(([cat, c]) => `
         <tr><td><span class="legend-dot" style="background:${POI_ESTILO[cat].color}"></span> ${cat}</td>
         <td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td></tr>`).join("");
+    const m = s.minutes;
     poiBlock = rows
       ? `<div class="zone-list"><strong>Servicios alcanzables (POIs, acumulado):</strong></div>
          <div class="buffer-table-wrap"><table class="buffer-table iso-table">
-           <tr><th>Categoría</th><th>≤5</th><th>≤10</th><th>≤15 min</th></tr>${rows}
+           <tr><th>Categoría</th><th>≤${m[0]}</th><th>≤${m[1]}</th><th>≤${m[2]} min</th></tr>${rows}
          </table></div>`
       : `<div class="zone-list">Ningún POI dentro de las isócronas.</div>`;
   } else {
@@ -386,7 +420,7 @@ function isoResultsHTML(s) {
     ${poiBlock}
     ${proyBlock}
     <div class="zone-note">${s.mode === "car"
-      ? "Isócronas en auto: TomTom sobre la red vial real, con <strong>condiciones de tráfico típicas</strong> (no en vivo)."
+      ? "Isócronas en auto: TomTom sobre la red vial real, con tráfico típico y <strong>calibrado contra Google Maps</strong> para Aguascalientes (×1.25)."
       : "Isócronas a pie: OpenRouteService sobre la red vial de OpenStreetMap (velocidad de caminata)."}
       Cada banda es el área alcanzable en ≤ N minutos desde el punto, puerta a puerta — útil para
       comparar conectividad entre zonas, no como hora de llegada exacta. POIs de OpenStreetMap
@@ -430,6 +464,23 @@ function renderIsoPanel(s, { loading = false, error = null } = {}) {
   for (const id of ["iso-lat", "iso-lng"]) {
     const el = document.getElementById(id);
     if (el) el.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  }
+
+  // Slider de tiempo máximo: arrastrar cambia las 3 bandas; al soltar, recalcula.
+  const slider = document.getElementById("iso-max");
+  const sliderVal = document.getElementById("iso-max-val");
+  if (slider) {
+    const setFill = () => slider.style.setProperty("--val", slider.value);
+    setFill();
+    slider.addEventListener("input", () => {
+      isoMaxMin = Number(slider.value);
+      sliderVal.textContent = `${isoMaxMin} min · bandas ${isoBands().join("/")}`;
+      setFill();
+    });
+    slider.addEventListener("change", () => {
+      isoMaxMin = Number(slider.value);
+      if (isoState) runIsocronas(isoState.lat, isoState.lng, isoMode, { fit: false });
+    });
   }
 }
 

@@ -933,6 +933,18 @@ body.iso-picking #map * {
   font-weight: 500;
 }
 
+/* slider de tiempo: mismo thumb que .bf-slider, pero el relleno se calcula
+   para el rango [3, 30] min (el de .bf-slider está cableado a [0.5, 10] km) */
+.iso-slider {
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) calc((var(--val, 3) - 3) / 27 * 100%),
+    var(--border) calc((var(--val, 3) - 3) / 27 * 100%),
+    var(--border) 100%
+  );
+}
+
 /* ---------- Comparador ---------- */
 .compare-panel {
   position: absolute;
