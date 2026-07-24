@@ -94,8 +94,8 @@
         <button id="iso-close" title="Quitar isócronas">✕</button>
       </div>
       <div id="iso-stats"></div>
-      <div class="zone-note">Tiempos de traslado sobre la red vial de OpenStreetMap (OpenRouteService).
-        Aproximados, sin tráfico en vivo — útiles para comparar conectividad entre puntos, no como ETA exacto.</div>
+      <div class="zone-note">Tiempos de traslado sobre la red vial real (auto con TomTom y tráfico típico,
+        a pie con OpenRouteService). Aproximados — útiles para comparar conectividad entre puntos, no como ETA exacto.</div>
     </aside>
 
     <!-- Comparador de colonias -->
@@ -477,8 +477,10 @@
       <h3>Isócronas (análisis "Isócronas")</h3>
       <p>Área alcanzable por <strong>tiempo de traslado</strong> desde un punto (clic en el mapa o
         coordenadas), en tres bandas de 5, 10 y 15 minutos, en auto o a pie. A diferencia del
-        análisis de Radio —un círculo geométrico—, el contorno sigue la <strong>red vial real</strong>
-        de OpenStreetMap, calculado con el motor de ruteo abierto de <em>OpenRouteService</em>. Sirve
+        análisis de Radio —un círculo geométrico—, el contorno sigue la <strong>red vial real</strong>.
+        El modo <em>Auto</em> se calcula con <em>TomTom</em> (usa condiciones de tráfico típicas, por eso
+        las áreas son realistas y no de velocidad libre); el modo <em>A pie</em>, con <em>OpenRouteService</em>
+        sobre datos de OpenStreetMap (TomTom no hace caminata). Sirve
         para demostrar conectividad: qué tan lejos se llega en X minutos y qué servicios (POIs) y
         proyectos de vivienda nueva quedan dentro de ese tiempo. Los tiempos son estimaciones sin
         tráfico en vivo (útiles para comparar puntos entre sí, no como hora de llegada exacta).</p>
@@ -525,7 +527,7 @@
   <script src="zona.js?v=8"></script>
   <script src="reporte.js?v=6"></script>
   <script src="softec.js?v=3"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=3"></script>
   <script src="proyectos.js?v=5"></script>
   <script src="poi.js?v=4"></script>
   <script src="denue_proxy.js?v=1"></script>
@@ -533,7 +535,7 @@
   <script src="trafico.js?v=5"></script>
   <script src="buffer-core.js?v=1"></script>
   <script src="buffer.js?v=6"></script>
-  <script src="isocronas.js?v=2"></script>
+  <script src="isocronas.js?v=3"></script>
   <!-- al final: lee/escribe estado de main, zona, buffer, isócronas, poi y proyectos -->
   <script src="permalink.js?v=6"></script>
 

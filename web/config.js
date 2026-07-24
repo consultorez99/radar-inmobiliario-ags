@@ -2,7 +2,9 @@
  *
  * TOMTOM_API_KEY: clave del Developer Portal de TomTom
  * (https://developer.tomtom.com — plan gratuito: 50,000 tiles/día).
- * Alimenta la capa "Tráfico" (flujo vehicular en tiempo real).
+ * Alimenta la capa "Tráfico" (flujo vehicular en tiempo real) y el modo Auto
+ * de la capa "Isócronas" (Routing API "Calculate Reachable Range" — usa tráfico
+ * típico, por eso da áreas más realistas que ORS en velocidad libre).
  *
  * NOTA: al ser una app 100% estática, esta clave es visible para cualquiera
  * que inspeccione el sitio. En el portal de TomTom, restringe la clave por
@@ -18,12 +20,13 @@ const TOMTOM_API_KEY = "nCONdLiT2PF3t0aaB9TdbevIqBis8QAZ";
 
 /* ORS_API_KEY: clave del panel de OpenRouteService
  * (https://openrouteservice.org/dev/#/signup — plan gratuito: 500 isócronas/día,
- * 20/min). Alimenta la capa "Isócronas" (área alcanzable por tiempo de traslado
- * en auto o a pie, sobre la red vial de OpenStreetMap).
+ * 20/min). Alimenta el modo "A pie" de la capa "Isócronas" (una sola llamada
+ * trae las tres bandas, sobre la red vial de OpenStreetMap).
  *
- * TomTom NO sirve para esto: su endpoint "Reachable Range" es solo motorizado y
- * rechaza el modo a pie. Por eso las isócronas usan OpenRouteService, que sí
- * hace auto y a pie (y bici) y devuelve las tres bandas en una sola llamada.
+ * El modo Auto NO usa ORS sino TomTom: ORS calcula en velocidad libre (sin
+ * tráfico) y sus áreas de auto salían poco realistas; TomTom usa tráfico típico.
+ * Pero TomTom no puede caminar (su "Reachable Range" es solo motorizado, rechaza
+ * el modo a pie), así que el "A pie" sí depende de ORS.
  *
  * NOTA: al ser una app 100% estática, esta clave viaja al navegador y es visible
  * para cualquiera que inspeccione el sitio (igual que la de TomTom). ORS no

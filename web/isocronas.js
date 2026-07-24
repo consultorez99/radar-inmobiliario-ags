@@ -4,19 +4,26 @@
  * y qué se alcanza dentro de ese tiempo.
  *
  * A diferencia del análisis de Radio (buffer.js), que traza un círculo
- * geométrico con turf, aquí el contorno sigue la red vial real (grafo de
- * OpenStreetMap). Como el sitio es 100% estático, eso obliga a un motor de
- * ruteo externo: se usa el endpoint de isócronas de OpenRouteService, que
- * devuelve las tres bandas de tiempo en UNA sola llamada. La clave ORS_API_KEY
- * vive en config.js (gratuita; hay que registrarse en openrouteservice.org).
- * TomTom no sirve aquí: su "Reachable Range" es solo motorizado y rechaza el
- * modo a pie.
+ * geométrico con turf, aquí el contorno sigue la red vial real. Como el sitio
+ * es 100% estático, eso obliga a un motor de ruteo externo, y se usa uno
+ * distinto por modo según cuál da resultados más realistas:
+ *
+ *   - Auto  -> TomTom "Calculate Reachable Range" (una llamada por banda). Usa
+ *              condiciones de tráfico típicas, así que las áreas son mucho más
+ *              conservadoras/realistas que las de ORS (que va en velocidad
+ *              libre). Clave TOMTOM_API_KEY (config.js, restringida por dominio).
+ *   - A pie -> OpenRouteService (una sola llamada trae las tres bandas). TomTom
+ *              no puede: su "Reachable Range" es solo motorizado y rechaza el
+ *              modo a pie. Clave ORS_API_KEY (config.js, gratuita).
+ *
+ * El resto (banding, dibujo, conteo de conectividad) es igual sin importar el
+ * motor: ambos devuelven polígonos anidados P5 ⊂ P10 ⊂ P15.
  *
  * Con las bandas ya calculadas se cuenta qué cae dentro de cada tiempo (POIs
  * por categoría y proyectos de vivienda nueva) como prueba de conectividad.
  *
  * Requiere: turf (CDN), main.js (map, DATA, drawnItems*), config.js
- * (ORS_API_KEY), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
+ * (TOMTOM_API_KEY y ORS_API_KEY), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
  * (PROYECTOS_SOFTEC). Es excluyente con el análisis de Radio (buffer.js) y de
  * polígono (zona.js): iniciar cualquiera limpia los otros.
  * (*drawnItems/currentZone/currentStats son globales de zona.js — scripts
@@ -27,9 +34,9 @@
 
 const ISO_MINUTES = [5, 10, 15]; // bandas de tiempo (min)
 const ISO_MODES = {
-  car:        { label: "Auto",  ors: "driving-car" },
-  pedestrian: { label: "A pie", ors: "foot-walking" },
-  // Para habilitar bici, agregar: cycling: { label: "Bici", ors: "cycling-regular" }
+  car:        { label: "Auto",  engine: "tomtom", tomtom: "car" },
+  pedestrian: { label: "A pie", engine: "ors",    ors: "foot-walking" },
+  // Para habilitar bici (ORS): cycling: { label: "Bici", engine: "ors", ors: "cycling-regular" }
 };
 // Paleta tipo semáforo suave: verde = cerca en tiempo, rojo = lejos.
 const ISO_COLORS = ["#2a9d8f", "#e9c46a", "#e76f51"]; // 5 / 10 / 15 min
@@ -44,6 +51,40 @@ const isoCache = new Map(); // "lat|lng|mode" -> state
 
 const isoFmt = (n, d = 0) =>
   n == null ? "s/d" : Number(n.toFixed(d)).toLocaleString("es-MX");
+
+// ------------------------------------------------------------------ TomTom
+// Un contorno alcanzable (polígono turf) para un presupuesto de tiempo. TomTom
+// solo hace modos motorizados, pero a cambio usa tráfico típico -> áreas
+// realistas. Una llamada por banda.
+async function isoFetchTomtom(lat, lng, travelMode, minutes) {
+  const url = `https://api.tomtom.com/routing/1/calculateReachableRange/${lat},${lng}/json?` +
+    new URLSearchParams({
+      key: TOMTOM_API_KEY,
+      travelMode,
+      timeBudgetInSec: String(minutes * 60),
+    });
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    let msg = `TomTom respondió ${resp.status}`;
+    if (resp.status === 403) msg += " — la clave no tiene habilitado el API de Routing (Reachable Range)";
+    else if (resp.status === 429) msg += " — límite de peticiones excedido, intenta en un momento";
+    throw new Error(msg + ".");
+  }
+  const data = await resp.json();
+  const boundary = data?.reachableRange?.boundary;
+  if (!Array.isArray(boundary) || boundary.length < 3) {
+    throw new Error("TomTom no devolvió un contorno válido para este punto.");
+  }
+  // boundary: [{latitude, longitude}] -> anillo GeoJSON [lng,lat], cerrado
+  const ring = boundary.map((p) => [p.longitude, p.latitude]);
+  ring.push(ring[0]);
+  return turf.polygon([ring]);
+}
+
+// Las tres bandas por TomTom, en paralelo (una llamada cada una).
+function isoFetchTomtomBands(lat, lng, travelMode) {
+  return Promise.all(ISO_MINUTES.map((m) => isoFetchTomtom(lat, lng, travelMode, m)));
+}
 
 // ------------------------------------------------------- OpenRouteService
 // Las tres bandas (polígonos turf) en una sola llamada. ORS devuelve un
@@ -82,7 +123,11 @@ async function analyzeIso(lat, lng, mode) {
   if (isoCache.has(key)) return isoCache.get(key);
 
   // polys[i] = área alcanzable en ISO_MINUTES[i] min (anidadas: P5 ⊂ P10 ⊂ P15).
-  const polys = await isoFetchBands(lat, lng, ISO_MODES[mode].ors);
+  // El motor depende del modo: Auto -> TomTom (con tráfico), A pie -> ORS.
+  const cfg = ISO_MODES[mode];
+  const polys = cfg.engine === "tomtom"
+    ? await isoFetchTomtomBands(lat, lng, cfg.tomtom)
+    : await isoFetchBands(lat, lng, cfg.ors);
 
   // Bandas disjuntas para dibujar (anillo = polígono menos el interior) — así
   // los colores no se suman al traslaparse. Si turf.difference falla, se usa
@@ -180,9 +225,14 @@ function drawIso(state) {
 
 // --------------------------------------------------------------- ejecución
 function runIsocronas(lat, lng, mode, { fit = true } = {}) {
-  if (typeof ORS_API_KEY !== "string" || !ORS_API_KEY) {
+  const cfg = ISO_MODES[mode];
+  if (cfg.engine === "tomtom" && (typeof TOMTOM_API_KEY !== "string" || !TOMTOM_API_KEY)) {
+    renderIsoPanel(null, { error: "Falta la clave de TomTom en <code>config.js</code> para el modo Auto." });
+    return;
+  }
+  if (cfg.engine === "ors" && (typeof ORS_API_KEY !== "string" || !ORS_API_KEY)) {
     renderIsoPanel(null, {
-      error: 'Falta la clave de OpenRouteService. Regístrate gratis en ' +
+      error: 'Falta la clave de OpenRouteService para el modo A pie. Regístrate gratis en ' +
         '<a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> ' +
         'y pega tu clave en <code>ORS_API_KEY</code> (web/config.js).',
     });
@@ -335,9 +385,11 @@ function isoResultsHTML(s) {
     <div class="zone-cards iso-cards">${cards}</div>
     ${poiBlock}
     ${proyBlock}
-    <div class="zone-note">Isócronas calculadas sobre la red vial de OpenStreetMap con
-      OpenRouteService. Cada banda es el área alcanzable en ≤ N minutos desde el punto, puerta a
-      puerta y <strong>sin tráfico en vivo</strong> (tiempos aproximados). POIs de OpenStreetMap
+    <div class="zone-note">${s.mode === "car"
+      ? "Isócronas en auto: TomTom sobre la red vial real, con <strong>condiciones de tráfico típicas</strong> (no en vivo)."
+      : "Isócronas a pie: OpenRouteService sobre la red vial de OpenStreetMap (velocidad de caminata)."}
+      Cada banda es el área alcanzable en ≤ N minutos desde el punto, puerta a puerta — útil para
+      comparar conectividad entre zonas, no como hora de llegada exacta. POIs de OpenStreetMap
       (ODbL); proyectos del estudio de mercado 1T26.</div>`;
 }
 
