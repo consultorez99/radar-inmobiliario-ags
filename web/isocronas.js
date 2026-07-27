@@ -344,6 +344,8 @@ window.clearIsocronas = function (hidePanel = true) {
   isoState = null;
   stopIsoPicking();
   document.getElementById("btn-iso").classList.remove("active", "loading");
+  document.getElementById("btn-iso-report").classList.add("hidden");
+  document.getElementById("btn-iso-png").classList.add("hidden");
   if (hidePanel) document.getElementById("iso-panel").classList.add("hidden");
   window.plActualizar?.();
 };
@@ -480,6 +482,12 @@ function renderIsoPanel(s, { loading = false, error = null } = {}) {
   else if (s) inner += isoResultsHTML(s);
   body.innerHTML = inner;
   panel.classList.remove("hidden");
+
+  // Exportaciones: solo con un análisis terminado (durante la carga `s` es el
+  // resultado anterior, que ya no corresponde a lo dibujado).
+  const hayResultados = !!s && !loading && !error;
+  document.getElementById("btn-iso-report").classList.toggle("hidden", !hayResultados);
+  document.getElementById("btn-iso-png").classList.toggle("hidden", !hayResultados);
 
   // Selector de modo (Auto / A pie)
   body.querySelectorAll(".iso-mode-btn").forEach((btn) => {
