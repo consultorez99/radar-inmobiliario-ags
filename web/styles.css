@@ -339,6 +339,11 @@ body.iso-picking #map * {
 }
 
 .legend-dot {
+  /* inline-block: fuera de un contenedor flex (tarjetas y tablas del panel de
+     isócronas) un <span> inline ignora width/height y el punto se veía como un
+     círculo vacío. Dentro de .legend-row sigue igual: flex lo bloquifica. */
+  display: inline-block;
+  vertical-align: middle;
   width: 13px;
   height: 13px;
   border-radius: 50%;

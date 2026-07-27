@@ -75,8 +75,8 @@ async function capturaMapaPDF(doc, y) {
  * (p.ej. Carto/Stadia con licencia adecuada) — no ha sido necesario aquí
  * porque el mismo mecanismo ya funciona para el PDF.
  */
-async function exportarMapaPNG() {
-  const btn = document.getElementById("btn-png");
+async function exportarMapaPNG({ btnId = "btn-png", archivo = null } = {}) {
+  const btn = document.getElementById(btnId);
   const original = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = "Generando…";
@@ -101,11 +101,15 @@ async function exportarMapaPNG() {
 
     const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
-    const punto = window.getBufferStats?.()
-      ? `${bufferStats.lat.toFixed(5)}_${bufferStats.lng.toFixed(5)}_${bufferStats.radiusKm}km`
-      : "poligono";
     a.href = url;
-    a.download = `mapa-zona-estudio_${punto}.png`;
+    if (archivo) {
+      a.download = archivo;
+    } else {
+      const punto = window.getBufferStats?.()
+        ? `${bufferStats.lat.toFixed(5)}_${bufferStats.lng.toFixed(5)}_${bufferStats.radiusKm}km`
+        : "poligono";
+      a.download = `mapa-zona-estudio_${punto}.png`;
+    }
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -122,7 +126,7 @@ async function exportarMapaPNG() {
   }
 }
 
-document.getElementById("btn-png").addEventListener("click", exportarMapaPNG);
+document.getElementById("btn-png").addEventListener("click", () => exportarMapaPNG());
 
 async function generarReportePDF() {
   if (!currentStats) return null;
@@ -602,4 +606,176 @@ async function generarReporteBufferPDF() {
 document.getElementById("btn-report").addEventListener("click", () => {
   if (window.getBufferStats?.()) generarReporteBufferPDF();
   else generarReportePDF();
+});
+
+/* ------------------------------------------------------------------------
+ * Reporte PDF de las isócronas (tiempo de traslado desde un punto), con su
+ * propio botón porque el panel de isócronas es independiente del de zona de
+ * estudio. Estructura paralela a la del radio: resumen y mapa arriba, luego el
+ * detalle de lo que se alcanza dentro de cada banda de tiempo.
+ *
+ * Lee estado y constantes de isocronas.js (getIsoState, ISO_MODES). Ese
+ * archivo se carga DESPUÉS que este, pero solo el binding del listener corre
+ * al cargar: para cuando el usuario da clic ya existen.
+ */
+async function generarReporteIsocronasPDF() {
+  const s = window.getIsoState?.();
+  if (!s) return null;
+  const btn = document.getElementById("btn-iso-report");
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Generando…";
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const hoy = new Date().toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
+    const fmt = (n, dec = 0) => (n == null ? "s/d" : Number(n.toFixed(dec)).toLocaleString("es-MX"));
+    const modo = ISO_MODES[s.mode]?.label || s.mode;
+    const mins = s.minutes;
+    const maxMin = mins[mins.length - 1];
+    let y = 30;
+
+    const salto = () => { doc.addPage(); pdfHeader(doc, "Isócronas — continuación"); y = 30; };
+    const need = (mm) => { if (y + mm > 272) salto(); };
+    const parrafo = (txt, x, size, extra = 1) => {
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(txt, CONTENT_W - (x - MARGIN) - 2);
+      need(lines.length * (size * 0.46) + extra);
+      doc.setFontSize(size); // el salto de página resetea la fuente en pdfHeader
+      doc.text(lines, x, y);
+      y += lines.length * (size * 0.46) + extra;
+    };
+
+    // ---------------- resumen + mapa ----------------
+    pdfHeader(doc, `Isócronas · ${modo} — ${hoy}`);
+    doc.setFontSize(9.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Punto: ${s.lat.toFixed(6)}, ${s.lng.toFixed(6)}   ·   Modo: ${modo}   ·   ` +
+      `Bandas: ${mins.join(" / ")} minutos`,
+      MARGIN, y, { maxWidth: CONTENT_W });
+    y += 9;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Área alcanzable por tiempo de traslado", MARGIN, y);
+    y += 7;
+
+    const colW = CONTENT_W / 3;
+    doc.setFontSize(9.5);
+    s.bands.forEach((b, i) => {
+      const x = MARGIN + i * colW;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(110, 100, 130);
+      doc.text(`${b.min} min en ${modo.toLowerCase()}`, x, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${fmt(b.areaKm2, 1)} km²`, x, y + 5);
+    });
+    y += 13;
+
+    y = await capturaMapaPDF(doc, y);
+    y += 9;
+
+    // ---------------- servicios alcanzables (POIs) ----------------
+    const r = s.reach;
+    need(20);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Servicios alcanzables (OpenStreetMap, conteo acumulado)", MARGIN, y);
+    y += 5;
+
+    const filas = r.poisDisponibles
+      ? Object.entries(r.poi).filter(([, c]) => c[c.length - 1] > 0)
+          .sort((a, b) => b[1][b[1].length - 1] - a[1][a[1].length - 1])
+      : [];
+    if (filas.length) {
+      doc.setFontSize(8.5);
+      doc.setFillColor(232, 240, 246);
+      doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+      doc.setFont("helvetica", "bold");
+      doc.text("Categoría", MARGIN + 2, y);
+      mins.forEach((m, i) => doc.text(`≤ ${m} min`, MARGIN + 75 + i * 35, y, { align: "right" }));
+      doc.setFont("helvetica", "normal");
+      for (const [cat, conteos] of filas) {
+        y += 5.5;
+        if (y > 270) break;
+        doc.text(cat, MARGIN + 2, y);
+        conteos.forEach((n, i) => doc.text(String(n), MARGIN + 75 + i * 35, y, { align: "right" }));
+      }
+    } else {
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        r.poisDisponibles
+          ? "Ningún punto de interés dentro de las isócronas."
+          : "POIs no disponibles al generar el reporte (capa POI sin cargar).",
+        MARGIN + 2, y);
+    }
+    y += 11;
+
+    // ---------------- vivienda nueva alcanzable ----------------
+    need(16);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Vivienda nueva alcanzable — ${r.proyectos.length} proyectos (estudio 1T26)`, MARGIN, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    if (r.proyectos.length) {
+      const maxProy = 24;
+      for (const p of r.proyectos.slice(0, maxProy)) {
+        parrafo(`· ${p.nombre} (${p.tipo}) — ${p.minutos} min`, MARGIN + 2, 8.5, 1.2);
+      }
+      if (r.proyectos.length > maxProy) {
+        parrafo(`… y ${r.proyectos.length - maxProy} proyectos más`, MARGIN + 2, 8.5, 1.2);
+      }
+    } else {
+      parrafo("Sin proyectos del estudio dentro de las isócronas.", MARGIN + 2, 9, 1.2);
+    }
+    y += 7;
+
+    // ---------------- metodología ----------------
+    need(30);
+    doc.setFontSize(10.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("Metodología y advertencias", MARGIN, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(110, 100, 130);
+    const avisos = [
+      s.mode === "car"
+        ? "Modo Auto: contorno calculado con el Routing API de TomTom (Calculate Reachable Range) sobre la red vial real, con condiciones de tráfico típicas, y calibrado contra Google Maps para Aguascalientes (factor 1.25) — sin ese ajuste el alcance resultaba optimista."
+        : "Modo A pie: contorno calculado con OpenRouteService sobre la red vial de OpenStreetMap, a velocidad de caminata.",
+      "Cada banda es el área alcanzable en N minutos o menos desde el punto, puerta a puerta. El contorno se suaviza para su presentación, sin alterar el alcance calculado.",
+      "Los tiempos son estimaciones sin tráfico en vivo: sirven para comparar la conectividad entre zonas, no como hora de llegada de un viaje concreto.",
+      "Puntos de interés: OpenStreetMap (ODbL). Proyectos de vivienda nueva: estudio de mercado de terceros, corte 1T26.",
+      "Este reporte NO es un avalúo.",
+    ];
+    for (const a of avisos) parrafo("· " + a, MARGIN, 8, 1.6);
+    doc.setTextColor(40, 40, 40);
+
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      pdfFooter(doc, i, pages);
+    }
+
+    doc.save(`reporte-isocronas-${s.mode}-${maxMin}min-${new Date().toISOString().slice(0, 10)}.pdf`);
+    return doc;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original; // innerHTML: el botón lleva un icono SVG
+  }
+}
+
+document.getElementById("btn-iso-report").addEventListener("click", generarReporteIsocronasPDF);
+
+document.getElementById("btn-iso-png").addEventListener("click", () => {
+  const s = window.getIsoState?.();
+  if (!s) return;
+  exportarMapaPNG({
+    btnId: "btn-iso-png",
+    archivo: `mapa-isocronas_${s.lat.toFixed(5)}_${s.lng.toFixed(5)}_${s.mode}_${s.minutes[s.minutes.length - 1]}min.png`,
+  });
 });
