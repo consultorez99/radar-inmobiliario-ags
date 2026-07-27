@@ -30,11 +30,42 @@ function pdfFooter(doc, page, pages) {
   doc.setTextColor(40, 40, 40);
 }
 
+/* Alineación de las capas vectoriales al capturar el mapa.
+ *
+ * Leaflet posiciona el <svg> del overlay pane con un transform CSS y le pone un
+ * viewBox que arranca en ese mismo punto; en un navegador ambos se cancelan,
+ * pero html2canvas NO aplica el desplazamiento del viewBox, así que el trazo
+ * (isócronas, radio, zona) salía corrido respecto al mapa base y al marcador
+ * del punto de origen — el desfase crece conforme el usuario navega el mapa.
+ *
+ * Se corrige pasando ese transform a left/top, que html2canvas sí respeta. Se
+ * hace sobre la COPIA que html2canvas renderiza (hook onclone), no sobre el
+ * DOM real, así que la vista del usuario no parpadea ni se mueve.
+ *
+ * Medido en el navegador con un rectángulo SVG y un marcador HTML en el mismo
+ * punto: antes el trazo quedaba a (-79, -406) px del marcador; con esto, (-1, 0).
+ */
+function alinearVectoresEnClon(clonDoc) {
+  const vivos = document.querySelectorAll("#map .leaflet-overlay-pane svg");
+  clonDoc.querySelectorAll("#map .leaflet-overlay-pane svg").forEach((svg, i) => {
+    const orig = vivos[i];
+    if (!orig) return;
+    const t = getComputedStyle(orig).transform;
+    if (!t || t === "none") return;
+    const m = new DOMMatrixReadOnly(t);
+    if (!m.m41 && !m.m42) return;
+    svg.style.transform = "none";
+    svg.style.left = ((parseFloat(orig.style.left) || 0) + m.m41) + "px";
+    svg.style.top = ((parseFloat(orig.style.top) || 0) + m.m42) + "px";
+  });
+}
+
 /* Captura el mapa con html2canvas y lo inserta en el PDF. Devuelve la nueva y. */
 async function capturaMapaPDF(doc, y) {
   try {
     const canvas = await html2canvas(document.getElementById("map"), {
       useCORS: true, scale: 1, logging: false,
+      onclone: alinearVectoresEnClon,
       ignoreElements: (el) => el.classList && (
         el.classList.contains("zone-panel") || el.classList.contains("compare-panel") ||
         el.classList.contains("legend") || el.classList.contains("layer-panel") ||
@@ -88,6 +119,7 @@ async function exportarMapaPNG({ btnId = "btn-png", archivo = null } = {}) {
 
     const canvas = await html2canvas(mapEl, {
       useCORS: true, scale, logging: false,
+      onclone: alinearVectoresEnClon,
       ignoreElements: (el) => el.classList && (
         el.classList.contains("zone-panel") || el.classList.contains("compare-panel") ||
         el.classList.contains("legend") || el.classList.contains("layer-panel") ||
