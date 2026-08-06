@@ -566,29 +566,31 @@ document.getElementById("btn-json").addEventListener("click", exportBufferJSON);
 // mismo bufferCircle() que pinta el mapa es el que se escribe al .shp.
 function exportBufferSHP() {
   if (!bufferStats) return;
-  const { lat, lng, radiusKm, areaKm2 } = bufferStats;
-  const bytes = ShapefileZip.desdeGeometria({
-    geometry: bufferCircle(lat, lng, radiusKm).geometry,
-    campos: [
-      { nombre: "TIPO", tipo: "C", largo: 24 },
-      { nombre: "RADIO_KM", tipo: "N", largo: 10, decimales: 2 },
-      { nombre: "LAT", tipo: "N", largo: 12, decimales: 6 },
-      { nombre: "LON", tipo: "N", largo: 13, decimales: 6 },
-      { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
-      { nombre: "GENERADO", tipo: "C", largo: 10 },
-      { nombre: "FUENTE", tipo: "C", largo: 40 },
-    ],
-    valores: [
-      "radio",
-      String(radiusKm),
-      lat.toFixed(6),
-      lng.toFixed(6),
+  const { lat, lng, radiusKm, areaKm2, agebRows } = bufferStats;
+  const circulo = bufferCircle(lat, lng, radiusKm);
+  const fecha = new Date().toISOString().slice(0, 10);
+
+  // agebRows ya trae la fracción de área que usó la interpolación del panel:
+  // se exporta tal cual para que el .dbf reproduzca esas mismas cifras.
+  const capas = [
+    window.capaContorno(circulo.geometry, [
+      `radio ${radiusKm} km`,
       areaKm2.toFixed(2),
-      new Date().toISOString().slice(0, 10),
+      String(agebRows.length),
+      fecha,
       "Radar Inmobiliario Ags",
-    ],
-    capa: "zona-influencia",
-  });
+    ]),
+    ...BufferCore.capasSIG({
+      agebs: agebRows.map((r) => ({ feature: r.feature, frac: r.frac })),
+      colonias: featuresInZone(DATA.cat, circulo, "intersects"),
+      pdu: DATA.pdu ? featuresInZone(DATA.pdu, circulo, "intersects") : [],
+    }),
+  ];
+  const bytes = ShapefileZip.desdeCapas(capas, [{
+    nombre: "LEEME.txt",
+    datos: new TextEncoder().encode(
+      window.leemeSIG(`radio de ${radiusKm} km desde ${lat.toFixed(5)}, ${lng.toFixed(5)} (${areaKm2.toFixed(2)} km²)`, true)),
+  }]);
   window.descargarZip(bytes, `zona-influencia_${lat.toFixed(5)}_${lng.toFixed(5)}_${radiusKm}km_shp.zip`);
 }
 

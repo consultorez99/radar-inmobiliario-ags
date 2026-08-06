@@ -108,53 +108,67 @@
     return new Uint8Array(buf);
   }
 
-  function escribirShp(anillos) {
-    const caja = bbox(anillos);
-    const nPuntos = anillos.reduce((t, a) => t + a.length, 0);
-    // tipo(4) + caja(32) + numParts(4) + numPoints(4) + partes + puntos
-    const bytesContenido = 4 + 32 + 4 + 4 + 4 * anillos.length + 16 * nPuntos;
-    const total = 100 + 8 + bytesContenido;
+  /* Escribe el .shp de N registros (uno por feature). Devuelve también el
+   * índice (offset y largo de cada registro) porque el .shx lo necesita. */
+  function escribirShp(registros) {
+    const cajaTotal = bbox(registros.flat());
+    const tamanos = registros.map((anillos) => {
+      const nPuntos = anillos.reduce((t, a) => t + a.length, 0);
+      // tipo(4) + caja(32) + numParts(4) + numPoints(4) + partes + puntos
+      return 4 + 32 + 4 + 4 + 4 * anillos.length + 16 * nPuntos;
+    });
+    const total = 100 + tamanos.reduce((t, n) => t + 8 + n, 0);
 
     const buf = new ArrayBuffer(total);
     const v = new DataView(buf);
-    new Uint8Array(buf).set(encabezado(total / 2, caja), 0);
+    new Uint8Array(buf).set(encabezado(total / 2, cajaTotal), 0);
 
-    v.setInt32(100, 1, false); // número de registro (base 1)
-    v.setInt32(104, bytesContenido / 2, false);
+    const indice = [];
+    let o = 100;
+    registros.forEach((anillos, i) => {
+      indice.push({ offsetPalabras: o / 2, largoPalabras: tamanos[i] / 2 });
+      v.setInt32(o, i + 1, false); o += 4; // número de registro (base 1)
+      v.setInt32(o, tamanos[i] / 2, false); o += 4;
 
-    let o = 108;
-    v.setInt32(o, TIPO_POLIGONO, true); o += 4;
-    for (const c of caja) { v.setFloat64(o, c, true); o += 8; }
-    v.setInt32(o, anillos.length, true); o += 4;
-    v.setInt32(o, nPuntos, true); o += 4;
+      const caja = bbox([anillos]);
+      const nPuntos = anillos.reduce((t, a) => t + a.length, 0);
+      v.setInt32(o, TIPO_POLIGONO, true); o += 4;
+      for (const c of caja) { v.setFloat64(o, c, true); o += 8; }
+      v.setInt32(o, anillos.length, true); o += 4;
+      v.setInt32(o, nPuntos, true); o += 4;
 
-    let indice = 0;
-    for (const anillo of anillos) { v.setInt32(o, indice, true); o += 4; indice += anillo.length; }
-    for (const anillo of anillos) {
-      for (const [x, y] of anillo) {
-        v.setFloat64(o, x, true); o += 8;
-        v.setFloat64(o, y, true); o += 8;
+      let desde = 0;
+      for (const anillo of anillos) { v.setInt32(o, desde, true); o += 4; desde += anillo.length; }
+      for (const anillo of anillos) {
+        for (const [x, y] of anillo) {
+          v.setFloat64(o, x, true); o += 8;
+          v.setFloat64(o, y, true); o += 8;
+        }
       }
-    }
-    return { bytes: new Uint8Array(buf), bytesContenido, caja };
+    });
+    return { bytes: new Uint8Array(buf), indice, caja: cajaTotal };
   }
 
-  function escribirShx(bytesContenido, caja) {
-    const buf = new ArrayBuffer(108);
+  function escribirShx(indice, caja) {
+    const total = 100 + 8 * indice.length;
+    const buf = new ArrayBuffer(total);
     const v = new DataView(buf);
-    new Uint8Array(buf).set(encabezado(108 / 2, caja), 0);
-    v.setInt32(100, 50, false); // offset del registro, en palabras (100/2)
-    v.setInt32(104, bytesContenido / 2, false);
+    new Uint8Array(buf).set(encabezado(total / 2, caja), 0);
+    indice.forEach((r, i) => {
+      v.setInt32(100 + 8 * i, r.offsetPalabras, false);
+      v.setInt32(104 + 8 * i, r.largoPalabras, false);
+    });
     return new Uint8Array(buf);
   }
 
   /* --- .dbf ---------------------------------------------------------------- */
 
-  /* campos: [{ nombre, tipo: "C"|"N", largo, decimales }] — nombre <= 10 bytes. */
-  function escribirDbf(campos, valores) {
+  /* campos: [{ nombre, tipo: "C"|"N", largo, decimales }] — nombre <= 10 bytes.
+   * filas:  [[v1, v2, …], …] en el mismo orden que `campos`. */
+  function escribirDbf(campos, filas) {
     const largoRegistro = 1 + campos.reduce((t, c) => t + c.largo, 0);
     const largoEncabezado = 32 + 32 * campos.length + 1;
-    const total = largoEncabezado + largoRegistro + 1; // +1 = marca de fin (0x1A)
+    const total = largoEncabezado + largoRegistro * filas.length + 1; // +1 = fin (0x1A)
 
     const buf = new ArrayBuffer(total);
     const v = new DataView(buf);
@@ -165,7 +179,7 @@
     b[1] = hoy.getFullYear() - 1900;
     b[2] = hoy.getMonth() + 1;
     b[3] = hoy.getDate();
-    v.setUint32(4, 1, true); // un registro
+    v.setUint32(4, filas.length, true);
     v.setUint16(8, largoEncabezado, true);
     v.setUint16(10, largoRegistro, true);
 
@@ -180,20 +194,22 @@
     b[largoEncabezado - 1] = 0x0d; // fin de descriptores
 
     let o = largoEncabezado;
-    b[o++] = 0x20; // marca de "no borrado"
-    campos.forEach((campo, i) => {
-      const texto = utf8(valores[i]).slice(0, campo.largo);
-      const relleno = campo.largo - texto.length;
-      // Convención dBase: numéricos alineados a la derecha, texto a la izquierda.
-      if (campo.tipo === "N") {
-        b.fill(0x20, o, o + relleno);
-        b.set(texto, o + relleno);
-      } else {
-        b.set(texto, o);
-        b.fill(0x20, o + texto.length, o + campo.largo);
-      }
-      o += campo.largo;
-    });
+    for (const fila of filas) {
+      b[o++] = 0x20; // marca de "no borrado"
+      campos.forEach((campo, i) => {
+        const texto = utf8(fila[i]).slice(0, campo.largo);
+        const relleno = campo.largo - texto.length;
+        // Convención dBase: numéricos alineados a la derecha, texto a la izquierda.
+        if (campo.tipo === "N") {
+          b.fill(0x20, o, o + relleno);
+          b.set(texto, o + relleno);
+        } else {
+          b.set(texto, o);
+          b.fill(0x20, o + texto.length, o + campo.largo);
+        }
+        o += campo.largo;
+      });
+    }
     b[o] = 0x1a;
     return b;
   }
@@ -271,24 +287,40 @@
 
   /* --- API ----------------------------------------------------------------- */
 
-  /* Arma el ZIP de un shapefile de un solo polígono.
-   *   geometry  Polygon o MultiPolygon (GeoJSON)
+  /* Archivos de UNA capa (un .shp con N polígonos).
+   *   capa      nombre base dentro del ZIP
    *   campos    [{ nombre, tipo, largo, decimales }]
-   *   valores   valores en el mismo orden que `campos`
-   *   capa      nombre base de los archivos dentro del ZIP
-   * Devuelve Uint8Array. */
-  function desdeGeometria({ geometry, campos = [], valores = [], capa = "zona" }) {
-    const anillos = anillosDe(geometry);
-    const shp = escribirShp(anillos);
-    const shx = escribirShx(shp.bytesContenido, shp.caja);
-    return zip([
+   *   filas     [{ geometry, valores: [...] }] — un renglón por polígono
+   * Un shapefile admite una sola geometría y un solo esquema de atributos, por
+   * eso cada capa es un archivo aparte y no todas juntas. */
+  function archivosDeCapa({ capa, campos = [], filas = [] }) {
+    if (filas.length === 0) return [];
+    const registros = filas.map((f) => anillosDe(f.geometry));
+    const shp = escribirShp(registros);
+    return [
       { nombre: capa + ".shp", datos: shp.bytes },
-      { nombre: capa + ".shx", datos: shx },
-      { nombre: capa + ".dbf", datos: escribirDbf(campos, valores) },
+      { nombre: capa + ".shx", datos: escribirShx(shp.indice, shp.caja) },
+      { nombre: capa + ".dbf", datos: escribirDbf(campos, filas.map((f) => f.valores)) },
       { nombre: capa + ".prj", datos: utf8(PRJ_WGS84) },
       { nombre: capa + ".cpg", datos: utf8("UTF-8") },
-    ]);
+    ];
   }
 
-  return { desdeGeometria, anillosDe, anilloHorario, areaConSigno, crc32, PRJ_WGS84 };
+  /* ZIP con varias capas. Las capas vacías se omiten (no tiene sentido un
+   * shapefile de cero features, y algunos lectores lo rechazan). */
+  function desdeCapas(capas, extras = []) {
+    const archivos = capas.flatMap(archivosDeCapa);
+    if (archivos.length === 0) throw new Error("No hay nada que exportar");
+    return zip(archivos.concat(extras));
+  }
+
+  /* Atajo para el caso de un solo polígono con un solo renglón de atributos. */
+  function desdeGeometria({ geometry, campos = [], valores = [], capa = "zona" }) {
+    return desdeCapas([{ capa, campos, filas: [{ geometry, valores }] }]);
+  }
+
+  return {
+    desdeCapas, desdeGeometria, archivosDeCapa,
+    anillosDe, anilloHorario, areaConSigno, crc32, PRJ_WGS84,
+  };
 });
