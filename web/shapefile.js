@@ -33,7 +33,84 @@
     'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],' +
     'PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]';
 
+  // EPSG:32613 — WGS 84 / UTM zona 13N, que es la que cubre Aguascalientes.
+  const PRJ_UTM13N =
+    'PROJCS["WGS_1984_UTM_Zone_13N",' + PRJ_WGS84 + ',PROJECTION["Transverse_Mercator"],' +
+    'PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",0.0],' +
+    'PARAMETER["Central_Meridian",-105.0],PARAMETER["Scale_Factor",0.9996],' +
+    'PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]';
+
   const utf8 = (s) => new TextEncoder().encode(String(s == null ? "" : s));
+
+  /* --- Proyección a UTM ----------------------------------------------------
+   *
+   * Serie clásica de Transverse Mercator (Snyder / USGS Professional Paper
+   * 1395) sobre el elipsoide WGS84. Con milímetros de error hasta ~3° del
+   * meridiano central; Aguascalientes está a 2.7° del de la zona 13 (-105°),
+   * así que sobra. Se implementa a mano porque el sitio es estático: meter
+   * proj4js por CDN para una sola fórmula no se justifica.
+   *
+   * OJO: solo sirve para la zona 13 norte. Un dato fuera de esa franja saldría
+   * con una distorsión creciente, por eso valida el rango de longitud.
+   */
+  const UTM13N = (() => {
+    const a = 6378137.0;                 // semieje mayor WGS84
+    const f = 1 / 298.257223563;         // achatamiento
+    const e2 = f * (2 - f);              // primera excentricidad al cuadrado
+    const ep2 = e2 / (1 - e2);           // segunda excentricidad
+    const k0 = 0.9996;                   // factor de escala de UTM
+    const lon0 = (-105 * Math.PI) / 180; // meridiano central de la zona 13
+    const FE = 500000;                   // falso este
+
+    return function proyectar(lon, lat) {
+      const phi = (lat * Math.PI) / 180;
+      const dLon = ((lon * Math.PI) / 180) - lon0;
+      const sin = Math.sin(phi), cos = Math.cos(phi), tan = Math.tan(phi);
+
+      const N = a / Math.sqrt(1 - e2 * sin * sin);
+      const T = tan * tan;
+      const C = ep2 * cos * cos;
+      const A = dLon * cos;
+
+      // Arco de meridiano desde el ecuador hasta phi.
+      const M = a * (
+        (1 - e2 / 4 - (3 * e2 * e2) / 64 - (5 * e2 * e2 * e2) / 256) * phi
+        - ((3 * e2) / 8 + (3 * e2 * e2) / 32 + (45 * e2 * e2 * e2) / 1024) * Math.sin(2 * phi)
+        + ((15 * e2 * e2) / 256 + (45 * e2 * e2 * e2) / 1024) * Math.sin(4 * phi)
+        - ((35 * e2 * e2 * e2) / 3072) * Math.sin(6 * phi)
+      );
+
+      const A2 = A * A, A3 = A2 * A, A4 = A3 * A, A5 = A4 * A, A6 = A5 * A;
+      const este = FE + k0 * N * (
+        A + ((1 - T + C) * A3) / 6 + ((5 - 18 * T + T * T + 72 * C - 58 * ep2) * A5) / 120
+      );
+      const norte = k0 * (M + N * tan * (
+        A2 / 2 + ((5 - T + 9 * C + 4 * C * C) * A4) / 24
+        + ((61 - 58 * T + T * T + 600 * C - 330 * ep2) * A6) / 720
+      ));
+      return [este, norte];
+    };
+  })();
+
+  /* Sistemas de referencia disponibles para la exportación. `proyectar` null
+   * = las coordenadas ya vienen en ese sistema (grados). */
+  const CRS = {
+    utm13n: {
+      nombre: "EPSG:32613 — WGS 84 / UTM zona 13N (metros)",
+      prj: PRJ_UTM13N,
+      proyectar: UTM13N,
+      // Rango útil de la zona 13 (108°O a 102°O) más un margen: Aguascalientes
+      // y Jesús María caen dentro, pero conviene fallar fuerte si algún día se
+      // exporta un dato de otra franja en vez de dibujarlo desplazado.
+      valido: (lon) => lon >= -111 && lon <= -99,
+    },
+    wgs84: {
+      nombre: "EPSG:4326 — WGS 84 (grados)",
+      prj: PRJ_WGS84,
+      proyectar: null,
+      valido: () => true,
+    },
+  };
 
   /* --- Geometría ----------------------------------------------------------- */
 
@@ -58,10 +135,15 @@
     return horario === !esHueco ? cerrado : cerrado.reverse();
   }
 
-  /* Normaliza Polygon / MultiPolygon a una lista de anillos ya orientados.
-   * En un MultiPolygon todos los anillos van al mismo registro: el shapefile
-   * no distingue "multi" — un polígono con varias partes ES el multipolígono. */
-  function anillosDe(geometry) {
+  /* Normaliza Polygon / MultiPolygon a una lista de anillos ya orientados y ya
+   * proyectados al CRS de salida. En un MultiPolygon todos los anillos van al
+   * mismo registro: el shapefile no distingue "multi" — un polígono con varias
+   * partes ES el multipolígono.
+   *
+   * La orientación se decide DESPUÉS de proyectar. UTM conserva el sentido de
+   * giro, así que da igual, pero medir sobre las coordenadas que realmente se
+   * escriben evita depender de esa propiedad. */
+  function anillosDe(geometry, crs = CRS.wgs84) {
     if (!geometry) throw new Error("Falta la geometría");
     const poligonos =
       geometry.type === "Polygon" ? [geometry.coordinates]
@@ -69,9 +151,18 @@
       : null;
     if (!poligonos) throw new Error("Geometría no soportada: " + geometry.type);
 
+    const proyectar = crs.proyectar
+      ? ([lon, lat]) => {
+          if (!crs.valido(lon)) {
+            throw new Error(`Longitud ${lon} fuera del alcance de ${crs.nombre}`);
+          }
+          return crs.proyectar(lon, lat);
+        }
+      : (p) => p;
+
     const anillos = [];
     for (const poligono of poligonos) {
-      poligono.forEach((anillo, i) => anillos.push(anilloHorario(anillo, i > 0)));
+      poligono.forEach((anillo, i) => anillos.push(anilloHorario(anillo.map(proyectar), i > 0)));
     }
     if (anillos.length === 0) throw new Error("El polígono no tiene anillos");
     return anillos;
@@ -293,34 +384,37 @@
    *   filas     [{ geometry, valores: [...] }] — un renglón por polígono
    * Un shapefile admite una sola geometría y un solo esquema de atributos, por
    * eso cada capa es un archivo aparte y no todas juntas. */
-  function archivosDeCapa({ capa, campos = [], filas = [] }) {
+  function archivosDeCapa({ capa, campos = [], filas = [] }, crs = CRS.wgs84) {
     if (filas.length === 0) return [];
-    const registros = filas.map((f) => anillosDe(f.geometry));
+    const registros = filas.map((f) => anillosDe(f.geometry, crs));
     const shp = escribirShp(registros);
     return [
       { nombre: capa + ".shp", datos: shp.bytes },
       { nombre: capa + ".shx", datos: escribirShx(shp.indice, shp.caja) },
       { nombre: capa + ".dbf", datos: escribirDbf(campos, filas.map((f) => f.valores)) },
-      { nombre: capa + ".prj", datos: utf8(PRJ_WGS84) },
+      { nombre: capa + ".prj", datos: utf8(crs.prj) },
       { nombre: capa + ".cpg", datos: utf8("UTF-8") },
     ];
   }
 
   /* ZIP con varias capas. Las capas vacías se omiten (no tiene sentido un
-   * shapefile de cero features, y algunos lectores lo rechazan). */
-  function desdeCapas(capas, extras = []) {
-    const archivos = capas.flatMap(archivosDeCapa);
+   * shapefile de cero features, y algunos lectores lo rechazan).
+   * `crs` por defecto UTM 13N: es lo que piden los gestores locales, y en
+   * metros las mediciones de área y distancia salen directo del archivo. */
+  function desdeCapas(capas, extras = [], crs = CRS.utm13n) {
+    const archivos = capas.flatMap((c) => archivosDeCapa(c, crs));
     if (archivos.length === 0) throw new Error("No hay nada que exportar");
     return zip(archivos.concat(extras));
   }
 
   /* Atajo para el caso de un solo polígono con un solo renglón de atributos. */
-  function desdeGeometria({ geometry, campos = [], valores = [], capa = "zona" }) {
-    return desdeCapas([{ capa, campos, filas: [{ geometry, valores }] }]);
+  function desdeGeometria({ geometry, campos = [], valores = [], capa = "zona", crs }) {
+    return desdeCapas([{ capa, campos, filas: [{ geometry, valores }] }], [], crs || CRS.utm13n);
   }
 
   return {
     desdeCapas, desdeGeometria, archivosDeCapa,
-    anillosDe, anilloHorario, areaConSigno, crc32, PRJ_WGS84,
+    anillosDe, anilloHorario, areaConSigno, crc32,
+    CRS, PRJ_WGS84, PRJ_UTM13N,
   };
 });

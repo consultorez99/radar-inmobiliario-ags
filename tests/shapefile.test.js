@@ -80,7 +80,8 @@ test("el ZIP trae los cinco archivos del shapefile", () => {
 });
 
 test("el encabezado del .shp declara código, tipo y bbox correctos", () => {
-  const bytes = ShapefileZip.desdeGeometria({ geometry: CUADRADO, capa: "z" });
+  // En grados: el bbox debe ser el del GeoJSON tal cual.
+  const bytes = ShapefileZip.desdeGeometria({ geometry: CUADRADO, capa: "z", crs: ShapefileZip.CRS.wgs84 });
   // El .shp es el primer archivo del ZIP: 30 bytes de encabezado local + nombre.
   const inicio = 30 + "z.shp".length;
   const shp = bytes.subarray(inicio);
@@ -182,4 +183,54 @@ test("una capa sin features se omite en vez de escribir un shapefile vacío", ()
 
 test("falla claro si no hay ninguna capa con features", () => {
   assert.throws(() => ShapefileZip.desdeCapas([{ capa: "x", campos: [], filas: [] }]), /nada que exportar/);
+});
+
+/* ---- Proyección a UTM zona 13N ------------------------------------------ */
+
+test("proyecta a UTM 13N con la precisión de PROJ (verificado contra pyproj)", () => {
+  // Valores de referencia de pyproj/PROJ para EPSG:4326 -> EPSG:32613.
+  const casos = [
+    [-102.2961, 21.8830, 779402.613, 2422335.259], // centro de Aguascalientes
+    [-102.3252, 21.8560, 776446.067, 2419291.742],
+    [-102.0000, 22.4000, 808887.441, 2480185.952],
+    [-102.9000, 21.6000, 717402.119, 2390020.739],
+  ];
+  for (const [lon, lat, ex, ey] of casos) {
+    const [x, y] = ShapefileZip.CRS.utm13n.proyectar(lon, lat);
+    assert.ok(Math.hypot(x - ex, y - ey) < 0.001, `${lon},${lat} se desvía más de 1 mm`);
+  }
+});
+
+test("por defecto el ZIP sale en UTM 13N, con el .prj que lo declara", () => {
+  const bytes = ShapefileZip.desdeGeometria({ geometry: CUADRADO, capa: "z" });
+  const texto = Buffer.from(bytes).toString("latin1");
+  assert.ok(texto.includes("WGS_1984_UTM_Zone_13N"));
+  assert.ok(texto.includes('PARAMETER["Central_Meridian",-105.0]'), "meridiano central de la zona 13");
+  assert.ok(texto.includes('UNIT["Meter",1.0]'), "las unidades deben ser metros");
+
+  // Y el bbox del encabezado ya viene en metros, no en grados.
+  const shp = bytes.subarray(30 + "z.shp".length);
+  const v = new DataView(shp.buffer, shp.byteOffset, shp.byteLength);
+  const xmin = v.getFloat64(36, true);
+  assert.ok(xmin > 100000 && xmin < 900000, "el este debe caer en el rango de una zona UTM");
+});
+
+test("el área en metros del polígono proyectado es la real, no la de los grados", () => {
+  // Cuadrado de 0.1° x 0.1° cerca de Aguascalientes: ~10.3 km x ~11.1 km.
+  const [x0, y0] = ShapefileZip.CRS.utm13n.proyectar(-102.3, 21.8);
+  const [x1, y1] = ShapefileZip.CRS.utm13n.proyectar(-102.2, 21.9);
+  const km2 = (Math.abs(x1 - x0) * Math.abs(y1 - y0)) / 1e6;
+  assert.ok(km2 > 100 && km2 < 130, `área inesperada: ${km2.toFixed(1)} km²`);
+});
+
+test("rechaza coordenadas fuera del alcance de la zona 13 en vez de desplazarlas", () => {
+  const enEuropa = { type: "Polygon", coordinates: [[[2.3, 48.8], [2.4, 48.8], [2.4, 48.9], [2.3, 48.8]]] };
+  assert.throws(() => ShapefileZip.desdeGeometria({ geometry: enEuropa }), /fuera del alcance/);
+});
+
+test("se puede pedir el ZIP en grados si alguien lo necesita así", () => {
+  const bytes = ShapefileZip.desdeGeometria({ geometry: CUADRADO, capa: "z", crs: ShapefileZip.CRS.wgs84 });
+  const texto = Buffer.from(bytes).toString("latin1");
+  assert.ok(!texto.includes("UTM_Zone_13N"));
+  assert.ok(texto.includes('UNIT["Degree"'));
 });
