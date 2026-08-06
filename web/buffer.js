@@ -572,14 +572,13 @@ function exportBufferSHP() {
 
   // agebRows ya trae la fracción de área que usó la interpolación del panel:
   // se exporta tal cual para que el .dbf reproduzca esas mismas cifras.
+  // Los agregados salen del MISMO objeto canónico que alimenta al CSV y al
+  // JSON, así que la tabla del shapefile no puede desalinearse de ellos.
   const capas = [
-    window.capaContorno(circulo.geometry, [
-      `radio ${radiusKm} km`,
-      areaKm2.toFixed(2),
-      String(agebRows.length),
-      fecha,
-      "Radar Inmobiliario Ags",
-    ]),
+    BufferCore.capaZona(
+      circulo.geometry,
+      BufferCore.zonaDesdeAgregados(BufferCore.buildZonaAgregados(bufferStats), fecha),
+    ),
     ...BufferCore.capasSIG({
       agebs: agebRows.map((r) => ({ feature: r.feature, frac: r.frac })),
       colonias: featuresInZone(DATA.cat, circulo, "intersects"),

@@ -530,21 +530,28 @@ function descargarZip(bytes, nombre) {
 }
 window.descargarZip = descargarZip;
 
-/* Capa del contorno: común a los dos modos, cambia solo qué la describe. */
-function capaContorno(geometry, valores) {
+/* Agregados del polígono dibujado en la forma que espera capaZona. Ojo: este
+ * modo NO interpola por área — cuenta cada AGEB completa (ver analyzeZone), y
+ * por eso METODO lo dice y la cobertura de AGEB va vacía: son campos que este
+ * análisis no calcula, y el .dbf no debe rellenarlos con un cero. */
+function zonaDesdePoligono(s, generado) {
   return {
-    capa: "zona",
-    campos: [
-      { nombre: "TIPO", tipo: "C", largo: 24 },
-      { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
-      { nombre: "N_AGEBS", tipo: "N", largo: 6 },
-      { nombre: "GENERADO", tipo: "C", largo: 10 },
-      { nombre: "FUENTE", tipo: "C", largo: 40 },
-    ],
-    filas: [{ geometry, valores }],
+    tipo: "poligono_dibujado",
+    radioKm: null, lat: null, lon: null,
+    areaKm2: s?.areaKm2, nAgebs: s?.nAgebs, coberturaAgebPct: null,
+    pobTotal: s?.pop,
+    pobFem: null, pobMas: null,
+    pob0a14: null, pob15a24: null, pob25a59: null, pob60mas: null,
+    vivHab: null, escolaridad: null, ocupCuarto: null,
+    nsePred: s?.nivelPred, nseScore: s?.nseScore,
+    pctInternet: null, pctAuto: null,
+    pct2dorm: s?.pct2dorm, pct3cuart: s?.pct3cuart, pctDeshabitadas: null,
+    catN: s?.catStats?.n, catMin: s?.catStats?.min,
+    catMed: s?.catStats?.med, catMax: s?.catStats?.max,
+    metodo: "ageb_completa_sin_interpolacion",
+    generado,
   };
 }
-window.capaContorno = capaContorno;
 
 /* Nota que viaja dentro del ZIP: quien reciba el shapefile suelto, sin la app,
  * necesita saber de dónde salió cada capa y con qué método. */
@@ -586,13 +593,7 @@ function exportZonaSHP() {
   // que la fracción va nula: el .dbf no debe sugerir un cálculo que no se hizo.
   const agebs = featuresInZone(DATA.agebs, currentZone, "intersects").map((f) => ({ feature: f, frac: null }));
   const capas = [
-    capaContorno(currentZone.geometry, [
-      "poligono_dibujado",
-      (currentStats?.areaKm2 ?? 0).toFixed(2),
-      String(currentStats?.nAgebs ?? 0),
-      fecha,
-      "Radar Inmobiliario Ags",
-    ]),
+    BufferCore.capaZona(currentZone.geometry, zonaDesdePoligono(currentStats, fecha)),
     ...BufferCore.capasSIG({
       agebs,
       colonias: featuresInZone(DATA.cat, currentZone, "intersects"),
