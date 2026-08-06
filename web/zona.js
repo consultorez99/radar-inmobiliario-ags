@@ -530,10 +530,10 @@ function descargarZip(bytes, nombre) {
 }
 window.descargarZip = descargarZip;
 
-function exportZonaSHP() {
-  const fecha = new Date().toISOString().slice(0, 10);
-  const bytes = ShapefileZip.desdeGeometria({
-    geometry: currentZone.geometry,
+/* Capa del contorno: común a los dos modos, cambia solo qué la describe. */
+function capaContorno(geometry, valores) {
+  return {
+    capa: "zona",
     campos: [
       { nombre: "TIPO", tipo: "C", largo: 24 },
       { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
@@ -541,15 +541,66 @@ function exportZonaSHP() {
       { nombre: "GENERADO", tipo: "C", largo: 10 },
       { nombre: "FUENTE", tipo: "C", largo: 40 },
     ],
-    valores: [
+    filas: [{ geometry, valores }],
+  };
+}
+window.capaContorno = capaContorno;
+
+/* Nota que viaja dentro del ZIP: quien reciba el shapefile suelto, sin la app,
+ * necesita saber de dónde salió cada capa y con qué método. */
+function leemeSIG(descripcionZona, conFraccion) {
+  return [
+    "Radar Inmobiliario · Aguascalientes — exportación a SIG",
+    "Generado: " + new Date().toISOString(),
+    "Zona: " + descripcionZona,
+    "Sistema de referencia: EPSG:4326 (WGS84). Atributos en UTF-8 (ver .cpg).",
+    "",
+    "CAPAS",
+    "  zona                contorno del área de estudio",
+    "  agebs               AGEBs urbanas 2020 que intersectan la zona (INEGI Censo 2020)",
+    "  colonias_catastral  colonias con valor de suelo (Leyes de Ingresos 2026)",
+    "  pdu_usos            zonificación de uso de suelo (PDUCA / PDU / PMDU)",
+    "",
+    "IMPORTANTE",
+    "Las geometrías NO están recortadas al contorno: se exporta el polígono",
+    "completo de cada AGEB, colonia o uso de suelo que toca la zona. Un AGEB",
+    "partido a la mitad deja de ser la unidad censal a la que corresponden sus",
+    "cifras, así que POBTOT y demás campos son los del AGEB ENTERO.",
+    conFraccion
+      ? "El campo FRAC_ZONA trae la fracción (0-1) del área del AGEB dentro de la" +
+        "\nzona: multiplica por él para reproducir la interpolación areal del panel."
+      : "FRAC_ZONA va vacío: en modo polígono el panel cuenta cada AGEB completa," +
+        "\nno interpola por área, y el shapefile no inventa un dato que no se calculó.",
+    "",
+    "El NSE es un proxy propio con Censo 2020 (INEGI), no la metodología AMAI.",
+    "Estimaciones con datos abiertos. No es un avalúo ni un conteo exacto.",
+  ].join("\n");
+}
+window.leemeSIG = leemeSIG;
+
+function exportZonaSHP() {
+  const fecha = new Date().toISOString().slice(0, 10);
+  // El panel de polígono cuenta cada AGEB completa (no interpola por área), así
+  // que la fracción va nula: el .dbf no debe sugerir un cálculo que no se hizo.
+  const agebs = featuresInZone(DATA.agebs, currentZone, "intersects").map((f) => ({ feature: f, frac: null }));
+  const capas = [
+    capaContorno(currentZone.geometry, [
       "poligono_dibujado",
       (currentStats?.areaKm2 ?? 0).toFixed(2),
       String(currentStats?.nAgebs ?? 0),
       fecha,
       "Radar Inmobiliario Ags",
-    ],
-    capa: "zona-poligono",
-  });
+    ]),
+    ...BufferCore.capasSIG({
+      agebs,
+      colonias: featuresInZone(DATA.cat, currentZone, "intersects"),
+      pdu: DATA.pdu ? featuresInZone(DATA.pdu, currentZone, "intersects") : [],
+    }),
+  ];
+  const bytes = ShapefileZip.desdeCapas(capas, [{
+    nombre: "LEEME.txt",
+    datos: new TextEncoder().encode(leemeSIG(`polígono dibujado, ${(currentStats?.areaKm2 ?? 0).toFixed(2)} km²`, false)),
+  }]);
   descargarZip(bytes, `zona-poligono_${fecha}_shp.zip`);
 }
 

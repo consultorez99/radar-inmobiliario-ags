@@ -456,10 +456,113 @@
     return rows;
   }
 
+  /* ---- Capas para exportar a shapefile ------------------------------------
+   *
+   * Un shapefile admite UNA geometría y UN esquema de atributos, así que el ZIP
+   * lleva una capa por tema en vez de todo junto. Los nombres de campo van a 10
+   * bytes o menos porque el .dbf los trunca ahí y dos que colapsen al mismo
+   * nombre se pisan en silencio: por eso están escritos a mano y no derivados
+   * de las propiedades.
+   *
+   * Las geometrías salen COMPLETAS, no recortadas al contorno de la zona: un
+   * AGEB partido a la mitad deja de ser la unidad censal a la que corresponden
+   * sus cifras, y quien lo abriera leería POBTOT como si fuera de ese pedazo.
+   * La fracción dentro de la zona viaja en FRAC_ZONA, así se puede reproducir
+   * la interpolación areal que hace el panel.
+   */
+  const CAMPOS_AGEB = [
+    { nombre: "CVEGEO", tipo: "C", largo: 20 },
+    { nombre: "CVE_AGEB", tipo: "C", largo: 12 },
+    { nombre: "MUNICIPIO", tipo: "C", largo: 30 },
+    { nombre: "ZONA", tipo: "C", largo: 30 },
+    { nombre: "POBTOT", tipo: "N", largo: 10 },
+    { nombre: "POBFEM", tipo: "N", largo: 10 },
+    { nombre: "POBMAS", tipo: "N", largo: 10 },
+    { nombre: "VIVPARHAB", tipo: "N", largo: 10 },
+    { nombre: "GRAPROES", tipo: "N", largo: 8, decimales: 2 },
+    { nombre: "OCUP_CUART", tipo: "N", largo: 8, decimales: 2 },
+    { nombre: "NSE_NIVEL", tipo: "C", largo: 6 },
+    { nombre: "NSE_SCORE", tipo: "N", largo: 8, decimales: 4 },
+    { nombre: "PCT_2DORM", tipo: "N", largo: 8, decimales: 1 },
+    { nombre: "PCT_3CUAR", tipo: "N", largo: 8, decimales: 1 },
+    { nombre: "DENS_HAB", tipo: "N", largo: 12, decimales: 1 },
+    { nombre: "PCT_DESHAB", tipo: "N", largo: 8, decimales: 1 },
+    { nombre: "FRAC_ZONA", tipo: "N", largo: 6, decimales: 3 },
+  ];
+
+  const CAMPOS_COLONIA = [
+    { nombre: "CVEGEO", tipo: "C", largo: 20 },
+    { nombre: "NOM_ASEN", tipo: "C", largo: 60 },
+    { nombre: "TIPO", tipo: "C", largo: 24 },
+    { nombre: "CP", tipo: "C", largo: 6 },
+    { nombre: "MUNICIPIO", tipo: "C", largo: 30 },
+    { nombre: "SECTOR", tipo: "C", largo: 12 },
+    { nombre: "VALOR_M2", tipo: "N", largo: 12, decimales: 2 },
+  ];
+
+  const CAMPOS_PDU = [
+    { nombre: "MUNICIPIO", tipo: "C", largo: 30 },
+    { nombre: "PROGRAMA", tipo: "C", largo: 60 },
+    { nombre: "GRUPO", tipo: "C", largo: 40 },
+    { nombre: "USO", tipo: "C", largo: 120 },
+    { nombre: "HECTAREAS", tipo: "N", largo: 12, decimales: 2 },
+    { nombre: "PLANO", tipo: "C", largo: 24 },
+  ];
+
+  const sfNum = (v, dec = 0) =>
+    (v == null || v === "" || isNaN(Number(v))) ? "" : Number(v).toFixed(dec);
+  const sfTxt = (v) => (v == null ? "" : String(v));
+
+  const filaAgeb = ({ feature, frac }) => ({
+    geometry: feature.geometry,
+    valores: [
+      sfTxt(feature.properties.CVEGEO), sfTxt(feature.properties.CVE_AGEB),
+      sfTxt(feature.properties.municipio), sfTxt(feature.properties.zona),
+      sfNum(feature.properties.POBTOT), sfNum(feature.properties.POBFEM),
+      sfNum(feature.properties.POBMAS), sfNum(feature.properties.TVIVPARHAB),
+      sfNum(feature.properties.GRAPROES, 2), sfNum(feature.properties.PRO_OCUP_C, 2),
+      sfTxt(feature.properties.nse_nivel), sfNum(feature.properties.nse_score, 4),
+      sfNum(feature.properties.pct_2dorm, 1), sfNum(feature.properties.pct_3cuart, 1),
+      sfNum(feature.properties.densidad_hab_km2, 1), sfNum(feature.properties.pct_deshabitadas, 1),
+      sfNum(frac == null ? "" : frac, 3),
+    ],
+  });
+
+  const filaColonia = (f) => ({
+    geometry: f.geometry,
+    valores: [
+      sfTxt(f.properties.CVEGEO), sfTxt(f.properties.NOM_ASEN), sfTxt(f.properties.TIPO),
+      sfTxt(f.properties.CP), sfTxt(f.properties.municipio), sfTxt(f.properties.sector),
+      sfNum(f.properties.valor_m2, 2),
+    ],
+  });
+
+  const filaPdu = (f) => ({
+    geometry: f.geometry,
+    valores: [
+      sfTxt(f.properties.municipio), sfTxt(f.properties.programa), sfTxt(f.properties.grupo),
+      sfTxt(f.properties.uso), sfNum(f.properties.hectareas, 2), sfTxt(f.properties.plano),
+    ],
+  });
+
+  /* Capas temáticas del análisis, listas para ShapefileZip.desdeCapas().
+   *   agebs:    [{ feature, frac }] — frac null si no se calculó
+   *   colonias: features del catastral
+   *   pdu:      features de zonificación
+   * Las vacías se dejan pasar tal cual: el escritor las omite del ZIP. */
+  function capasSIG({ agebs = [], colonias = [], pdu = [] }) {
+    return [
+      { capa: "agebs", campos: CAMPOS_AGEB, filas: agebs.map(filaAgeb) },
+      { capa: "colonias_catastral", campos: CAMPOS_COLONIA, filas: colonias.map(filaColonia) },
+      { capa: "pdu_usos", campos: CAMPOS_PDU, filas: pdu.map(filaPdu) },
+    ];
+  }
+
   return {
     aggregateDemographics, coverageSinAgeb, catastralStats, weightedMean,
     CORTES_EDAD_NOTA, NOTA_METODO_BUFFER, NSE_NIVELES_ORDEN,
     buildZonaAgregados, buildZonaEstudioJSON, ZONA_ESTUDIO_SCHEMA_VERSION,
     csvEscape, bufferCSVRows,
+    capasSIG, CAMPOS_AGEB, CAMPOS_COLONIA, CAMPOS_PDU,
   };
 });
