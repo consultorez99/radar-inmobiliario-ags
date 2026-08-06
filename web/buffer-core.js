@@ -490,6 +490,45 @@
     { nombre: "FRAC_ZONA", tipo: "N", largo: 6, decimales: 3 },
   ];
 
+  /* La capa del contorno lleva los MISMOS indicadores agregados que el CSV, no
+   * solo la geometría: quien abra el shapefile sin el CSV al lado tiene que
+   * poder leer la zona completa en un renglón. Los campos vacíos significan
+   * "no se calculó en este modo" (p. ej. cobertura de AGEB, que solo aplica al
+   * radio) — nunca un cero inventado. */
+  const CAMPOS_ZONA = [
+    { nombre: "TIPO", tipo: "C", largo: 24 },
+    { nombre: "RADIO_KM", tipo: "N", largo: 8, decimales: 2 },
+    { nombre: "LAT", tipo: "N", largo: 12, decimales: 6 },
+    { nombre: "LON", tipo: "N", largo: 13, decimales: 6 },
+    { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
+    { nombre: "N_AGEBS", tipo: "N", largo: 6 },
+    { nombre: "COB_AGEB", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "POB_TOT", tipo: "N", largo: 12 },
+    { nombre: "POB_FEM", tipo: "N", largo: 12 },
+    { nombre: "POB_MAS", tipo: "N", largo: 12 },
+    { nombre: "POB_0_14", tipo: "N", largo: 12 },
+    { nombre: "POB_15_24", tipo: "N", largo: 12 },
+    { nombre: "POB_25_59", tipo: "N", largo: 12 },
+    { nombre: "POB_60MAS", tipo: "N", largo: 12 },
+    { nombre: "VIV_HAB", tipo: "N", largo: 12 },
+    { nombre: "ESCOLARID", tipo: "N", largo: 8, decimales: 2 },
+    { nombre: "OCUP_CUART", tipo: "N", largo: 8, decimales: 2 },
+    { nombre: "NSE_PRED", tipo: "C", largo: 6 },
+    { nombre: "NSE_SCORE", tipo: "N", largo: 8, decimales: 4 },
+    { nombre: "PCT_INTER", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "PCT_AUTO", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "PCT_2DORM", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "PCT_3CUART", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "PCT_DESHAB", tipo: "N", largo: 6, decimales: 1 },
+    { nombre: "CAT_N", tipo: "N", largo: 6 },
+    { nombre: "CAT_MIN", tipo: "N", largo: 12, decimales: 2 },
+    { nombre: "CAT_MED", tipo: "N", largo: 12, decimales: 2 },
+    { nombre: "CAT_MAX", tipo: "N", largo: 12, decimales: 2 },
+    { nombre: "METODO", tipo: "C", largo: 40 },
+    { nombre: "GENERADO", tipo: "C", largo: 10 },
+    { nombre: "FUENTE", tipo: "C", largo: 40 },
+  ];
+
   const CAMPOS_COLONIA = [
     { nombre: "CVEGEO", tipo: "C", largo: 20 },
     { nombre: "NOM_ASEN", tipo: "C", largo: 60 },
@@ -545,6 +584,63 @@
     ],
   });
 
+  /* Capa del contorno con los agregados. `d` es un objeto normalizado que arma
+   * cada modo: el radio lo deriva de buildZonaAgregados (mismos números que el
+   * CSV y el JSON por construcción) y el polígono, de su propio analyzeZone. */
+  function capaZona(geometry, d) {
+    return {
+      capa: "zona",
+      campos: CAMPOS_ZONA,
+      filas: [{
+        geometry,
+        valores: [
+          sfTxt(d.tipo), sfNum(d.radioKm, 2), sfNum(d.lat, 6), sfNum(d.lon, 6),
+          sfNum(d.areaKm2, 2), sfNum(d.nAgebs), sfNum(d.coberturaAgebPct, 1),
+          sfNum(d.pobTotal), sfNum(d.pobFem), sfNum(d.pobMas),
+          sfNum(d.pob0a14), sfNum(d.pob15a24), sfNum(d.pob25a59), sfNum(d.pob60mas),
+          sfNum(d.vivHab), sfNum(d.escolaridad, 2), sfNum(d.ocupCuarto, 2),
+          sfTxt(d.nsePred), sfNum(d.nseScore, 4),
+          sfNum(d.pctInternet, 1), sfNum(d.pctAuto, 1), sfNum(d.pct2dorm, 1),
+          sfNum(d.pct3cuart, 1), sfNum(d.pctDeshabitadas, 1),
+          sfNum(d.catN), sfNum(d.catMin, 2), sfNum(d.catMed, 2), sfNum(d.catMax, 2),
+          sfTxt(d.metodo), sfTxt(d.generado), "Radar Inmobiliario Ags",
+        ],
+      }],
+    };
+  }
+
+  /* Traduce el objeto canónico del radio (buildZonaAgregados) al de capaZona,
+   * para que la tabla del shapefile no pueda desalinearse del CSV. */
+  function zonaDesdeAgregados(a, generado) {
+    return {
+      tipo: `radio ${a.radioKm} km`,
+      radioKm: a.radioKm, lat: a.punto.lat, lon: a.punto.lng,
+      areaKm2: a.areaBufferKm2, nAgebs: a.agebsIntersectadas,
+      coberturaAgebPct: a.coberturaAgebPct,
+      pobTotal: a.demografia.poblacionTotal,
+      pobFem: a.demografia.poblacionFemenina,
+      pobMas: a.demografia.poblacionMasculina,
+      pob0a14: a.demografia.gruposEdad["0_14"],
+      pob15a24: a.demografia.gruposEdad["15_24"],
+      pob25a59: a.demografia.gruposEdad["25_59"],
+      pob60mas: a.demografia.gruposEdad["60_mas"],
+      vivHab: a.vivienda.viviendasParticularesHabitadas,
+      escolaridad: a.demografia.escolaridadPromedioAnios,
+      ocupCuarto: a.demografia.ocupantesPorCuartoPromedio,
+      nsePred: a.nseDistribucion.nivel_predominante,
+      nseScore: null, // el agregado del radio expone la distribución, no un score único
+      pctInternet: a.vivienda.pctConInternet,
+      pctAuto: a.vivienda.pctConAutomovil,
+      pct2dorm: a.vivienda.pct2masRecamaras,
+      pct3cuart: a.vivienda.pct3masCuartos,
+      pctDeshabitadas: a.vivienda.viviendasDeshabitadasPct,
+      catN: a.catastral.coloniasN, catMin: a.catastral.minM2,
+      catMed: a.catastral.medianaM2, catMax: a.catastral.maxM2,
+      metodo: "interpolacion_areal_por_fraccion_de_ageb",
+      generado,
+    };
+  }
+
   /* Capas temáticas del análisis, listas para ShapefileZip.desdeCapas().
    *   agebs:    [{ feature, frac }] — frac null si no se calculó
    *   colonias: features del catastral
@@ -563,6 +659,7 @@
     CORTES_EDAD_NOTA, NOTA_METODO_BUFFER, NSE_NIVELES_ORDEN,
     buildZonaAgregados, buildZonaEstudioJSON, ZONA_ESTUDIO_SCHEMA_VERSION,
     csvEscape, bufferCSVRows,
-    capasSIG, CAMPOS_AGEB, CAMPOS_COLONIA, CAMPOS_PDU,
+    capasSIG, capaZona, zonaDesdeAgregados,
+    CAMPOS_ZONA, CAMPOS_AGEB, CAMPOS_COLONIA, CAMPOS_PDU,
   };
 });
