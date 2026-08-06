@@ -83,6 +83,10 @@
         <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><circle cx="7" cy="8" r="1.3" fill="currentColor" stroke="none"/><path d="M3.5 15 8 10.5l3 3 2.5-2.5 3 3"/></svg>
         Exportar mapa PNG
       </button>
+      <button class="zone-report-btn zone-csv-btn hidden" id="btn-shp" title="Exportar el área de estudio como shapefile (.shp) — abre en QGIS/ArcGIS">
+        <svg class="icon" width="14" height="14" viewBox="0 0 20 20" stroke-width="1.5"><path d="M10 2.5 17 6.5v7l-7 4-7-4v-7z"/><path d="M3 6.5 10 10.5l7-4"/><line x1="10" y1="10.5" x2="10" y2="17.5"/></svg>
+        Exportar SHP
+      </button>
       <div class="zone-note">Estadísticas calculadas con datos abiertos (INEGI, Leyes de
         Ingresos 2026, IMPLAN). No es un avalúo.</div>
     </aside>
@@ -536,7 +540,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin=""></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin=""></script>
   <script src="main.js?v=14"></script>
-  <script src="zona.js?v=8"></script>
+  <script src="shapefile.js?v=1"></script>
+  <script src="buffer-core.js?v=1"></script>
+  <script src="zona.js?v=9"></script>
   <script src="reporte.js?v=8"></script>
   <script src="softec.js?v=3"></script>
   <script src="config.js?v=3"></script>
@@ -545,8 +551,7 @@
   <script src="denue_proxy.js?v=1"></script>
   <script src="denue_negocios.js?v=1"></script>
   <script src="trafico.js?v=5"></script>
-  <script src="buffer-core.js?v=1"></script>
-  <script src="buffer.js?v=6"></script>
+  <script src="buffer.js?v=7"></script>
   <script src="isocronas.js?v=8"></script>
   <!-- al final: lee/escribe estado de main, zona, buffer, isócronas, poi y proyectos -->
   <script src="permalink.js?v=7"></script>

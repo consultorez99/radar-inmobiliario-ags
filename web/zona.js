@@ -49,6 +49,7 @@ function clearZone() {
   document.getElementById("btn-csv").classList.add("hidden");
   document.getElementById("btn-json").classList.add("hidden");
   document.getElementById("btn-png").classList.add("hidden");
+  document.getElementById("btn-shp").classList.add("hidden");
   document.getElementById("zone-panel").classList.add("hidden");
   window.plActualizar?.();
 }
@@ -198,6 +199,7 @@ function renderZonePanel(s) {
   document.getElementById("btn-csv").classList.remove("hidden");
   document.getElementById("btn-json").classList.remove("hidden");
   document.getElementById("btn-png").classList.remove("hidden");
+  document.getElementById("btn-shp").classList.remove("hidden");
   document.getElementById("zone-panel").classList.remove("hidden");
   renderZoneCharts(s);
 }
@@ -507,4 +509,51 @@ document.getElementById("btn-csv").addEventListener("click", () => {
 document.getElementById("btn-json").addEventListener("click", () => {
   if (!currentZone) return; // si hay buffer activo, buffer.js maneja el evento
   exportZonaJSON();
+});
+
+// ---------------------------------------------------------------- Shapefile
+// Exporta SOLO el área de estudio como capa de polígono, para llevar el
+// contorno a QGIS/ArcGIS y cruzarlo ahí con otras capas. Los indicadores de la
+// zona siguen viajando en el CSV y el JSON, no aquí: el .dbf es una tabla
+// plana de un renglón y no admite la estructura anidada del contrato.
+
+/* Compartido con buffer.js: arma el Blob del ZIP y dispara la descarga. */
+function descargarZip(bytes, nombre) {
+  const blob = new Blob([bytes], { type: "application/zip" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+window.descargarZip = descargarZip;
+
+function exportZonaSHP() {
+  const fecha = new Date().toISOString().slice(0, 10);
+  const bytes = ShapefileZip.desdeGeometria({
+    geometry: currentZone.geometry,
+    campos: [
+      { nombre: "TIPO", tipo: "C", largo: 24 },
+      { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
+      { nombre: "N_AGEBS", tipo: "N", largo: 6 },
+      { nombre: "GENERADO", tipo: "C", largo: 10 },
+      { nombre: "FUENTE", tipo: "C", largo: 40 },
+    ],
+    valores: [
+      "poligono_dibujado",
+      (currentStats?.areaKm2 ?? 0).toFixed(2),
+      String(currentStats?.nAgebs ?? 0),
+      fecha,
+      "Radar Inmobiliario Ags",
+    ],
+    capa: "zona-poligono",
+  });
+  descargarZip(bytes, `zona-poligono_${fecha}_shp.zip`);
+}
+
+document.getElementById("btn-shp").addEventListener("click", () => {
+  if (!currentZone) return; // si hay buffer activo, buffer.js maneja el evento
+  exportZonaSHP();
 });
