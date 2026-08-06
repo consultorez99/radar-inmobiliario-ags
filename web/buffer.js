@@ -238,6 +238,7 @@ window.clearBufferAnalysis = function (hidePanel = true) {
   document.getElementById("btn-csv").classList.add("hidden");
   document.getElementById("btn-json").classList.add("hidden");
   document.getElementById("btn-png").classList.add("hidden");
+  document.getElementById("btn-shp").classList.add("hidden");
   if (hidePanel && !currentZone) {
     document.getElementById("zone-panel").classList.add("hidden");
   }
@@ -417,6 +418,7 @@ function renderBufferPanel(s) {
   document.getElementById("btn-csv").classList.toggle("hidden", !s);
   document.getElementById("btn-json").classList.toggle("hidden", !s);
   document.getElementById("btn-png").classList.toggle("hidden", !s);
+  document.getElementById("btn-shp").classList.toggle("hidden", !s);
   document.getElementById("zone-panel").classList.remove("hidden");
 
   // interacción del formulario
@@ -556,3 +558,38 @@ function exportBufferJSON() {
 }
 
 document.getElementById("btn-json").addEventListener("click", exportBufferJSON);
+
+// ---------------------------------------------------------------- Shapefile
+// El círculo de radio es un polígono como cualquier otro (turf.circle, 96
+// lados), así que se exporta igual que la zona dibujada. Se regenera aquí en
+// vez de guardarlo en bufferStats para no duplicar la fuente de verdad: el
+// mismo bufferCircle() que pinta el mapa es el que se escribe al .shp.
+function exportBufferSHP() {
+  if (!bufferStats) return;
+  const { lat, lng, radiusKm, areaKm2 } = bufferStats;
+  const bytes = ShapefileZip.desdeGeometria({
+    geometry: bufferCircle(lat, lng, radiusKm).geometry,
+    campos: [
+      { nombre: "TIPO", tipo: "C", largo: 24 },
+      { nombre: "RADIO_KM", tipo: "N", largo: 10, decimales: 2 },
+      { nombre: "LAT", tipo: "N", largo: 12, decimales: 6 },
+      { nombre: "LON", tipo: "N", largo: 13, decimales: 6 },
+      { nombre: "AREA_KM2", tipo: "N", largo: 12, decimales: 2 },
+      { nombre: "GENERADO", tipo: "C", largo: 10 },
+      { nombre: "FUENTE", tipo: "C", largo: 40 },
+    ],
+    valores: [
+      "radio",
+      String(radiusKm),
+      lat.toFixed(6),
+      lng.toFixed(6),
+      areaKm2.toFixed(2),
+      new Date().toISOString().slice(0, 10),
+      "Radar Inmobiliario Ags",
+    ],
+    capa: "zona-influencia",
+  });
+  window.descargarZip(bytes, `zona-influencia_${lat.toFixed(5)}_${lng.toFixed(5)}_${radiusKm}km_shp.zip`);
+}
+
+document.getElementById("btn-shp").addEventListener("click", exportBufferSHP);
