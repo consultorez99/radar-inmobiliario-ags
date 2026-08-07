@@ -168,16 +168,24 @@
     return anillos;
   }
 
+  /* Caja de una lista de anillos. Falla fuerte si no entra ni un punto: una
+   * caja [+inf, +inf, -inf, -inf] es sintácticamente válida y ArcGIS la acepta
+   * sin quejarse, pero como el índice espacial la usa para descartar features
+   * fuera de la vista, la capa se dibuja VACÍA aunque el .dbf se vea completo. */
   function bbox(anillos) {
     let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
     for (const anillo of anillos) {
       for (const [x, y] of anillo) {
+        if (!(Number.isFinite(x) && Number.isFinite(y))) {
+          throw new Error(`Coordenada no numérica en la geometría: ${x}, ${y}`);
+        }
         if (x < xmin) xmin = x;
         if (y < ymin) ymin = y;
         if (x > xmax) xmax = x;
         if (y > ymax) ymax = y;
       }
     }
+    if (xmin > xmax) throw new Error("No se pudo calcular la caja: no hay puntos");
     return [xmin, ymin, xmax, ymax];
   }
 
@@ -221,7 +229,9 @@
       v.setInt32(o, i + 1, false); o += 4; // número de registro (base 1)
       v.setInt32(o, tamanos[i] / 2, false); o += 4;
 
-      const caja = bbox([anillos]);
+      // bbox() ya recibe una LISTA de anillos: envolverla otra vez la hacía
+      // iterar anillos como si fueran puntos y escribía una caja infinita.
+      const caja = bbox(anillos);
       const nPuntos = anillos.reduce((t, a) => t + a.length, 0);
       v.setInt32(o, TIPO_POLIGONO, true); o += 4;
       for (const c of caja) { v.setFloat64(o, c, true); o += 8; }
