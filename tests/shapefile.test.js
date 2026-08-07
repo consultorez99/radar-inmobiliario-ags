@@ -94,6 +94,28 @@ test("el encabezado del .shp declara código, tipo y bbox correctos", () => {
   assert.equal(leerBE32(shp, 24) * 2, 100 + 8 + leerBE32(shp, 104) * 2);
 });
 
+test("cada registro del .shp trae SU propia caja, no una infinita", () => {
+  // Regresión: la caja por registro se calculaba envolviendo la lista de
+  // anillos en otro arreglo, así que el bucle recorría anillos como si fueran
+  // puntos y no entraba ninguna coordenada: quedaba [+inf, +inf, -inf, -inf].
+  // El archivo abría bien y el .dbf se veía completo, pero ArcGIS usa esa caja
+  // para el índice espacial y descartaba TODAS las features al dibujar.
+  const otro = {
+    type: "Polygon",
+    coordinates: [[[-102.1, 21.5], [-102.0, 21.5], [-102.0, 21.6], [-102.1, 21.6], [-102.1, 21.5]]],
+  };
+  const [{ datos: shp }] = ShapefileZip.archivosDeCapa(
+    { capa: "z", campos: [], filas: [{ geometry: CUADRADO, valores: [] }, { geometry: otro, valores: [] }] },
+    ShapefileZip.CRS.wgs84,
+  );
+  const v = new DataView(shp.buffer, shp.byteOffset, shp.byteLength);
+  const r = (o) => [0, 8, 16, 24].map((d) => Math.round(v.getFloat64(o + 12 + d, true) * 10) / 10);
+
+  assert.deepEqual(r(100), [-102.3, 21.8, -102.2, 21.9], "caja del registro 1");
+  const siguiente = 100 + 8 + leerBE32(shp, 104) * 2;
+  assert.deepEqual(r(siguiente), [-102.1, 21.5, -102.0, 21.6], "caja del registro 2");
+});
+
 test("el .dbf mide los campos en bytes, no en caracteres, y no parte los acentos", () => {
   const bytes = ShapefileZip.desdeGeometria({
     geometry: CUADRADO,
