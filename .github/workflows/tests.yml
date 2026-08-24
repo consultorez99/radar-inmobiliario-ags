@@ -1,0 +1,38 @@
+# Corre los tests de geometría (interpolación areal del análisis de zona y
+# export a shapefile) en cada push y en cada PR.
+# El sitio es estático y no se compila: Node aquí es solo el banco
+# de pruebas — turf 6.5.0 de package.json es la MISMA versión que index.html
+# carga del CDN, así que lo que se prueba aquí es lo que corre en el navegador.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Solo lectura: el workflow no escribe nada en el repo.
+permissions:
+  contents: read
+
+# Si llegan dos pushes seguidos a la misma rama, cancela el anterior.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 24 = LTS. El glob de `node --test "tests/**"` necesita Node >= 21.
+          node-version: '24'
+          cache: npm
+
+      # `npm ci` (no `install`): instala exacto lo del package-lock.json y
+      # falla si el lock quedó desfasado del package.json.
+      - run: npm ci
+
+      - run: npm test
