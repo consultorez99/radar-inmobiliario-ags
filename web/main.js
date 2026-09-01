@@ -814,7 +814,14 @@ function renderPoblacionChart(canvasId, poblacionMunicipios) {
   if (!entries.length) return null;
   const anios = Object.keys(entries[0][1].serie).map(Number).sort((a, b) => a - b);
 
-  return new Chart(document.getElementById(canvasId), {
+  // 2020 es el último censo; de ahí en adelante la serie es proyección CONAPO.
+  // Antes solo se advertía en el título, así que las dos mitades de la línea se
+  // leían igual de firmes: ahora el tramo proyectado va punteado y con un corte
+  // marcado en el eje.
+  const iCorte = anios.indexOf(2020);
+  const esProyeccion = (i) => iCorte >= 0 && i >= iCorte;
+
+  return RadarCharts.crear(canvasId, {
     type: "line",
     data: {
       labels: anios,
@@ -823,18 +830,32 @@ function renderPoblacionChart(canvasId, poblacionMunicipios) {
         data: anios.map((a) => v.serie[String(a)] ?? null),
         borderColor: POB_CHART_COLORS[i % POB_CHART_COLORS.length],
         backgroundColor: "transparent",
-        borderWidth: 2,
+        borderWidth: 1.8,
         pointRadius: 0,
+        pointHoverRadius: 3,
         tension: 0.15,
+        segment: {
+          borderDash: (c) => (esProyeccion(c.p0DataIndex) ? [4, 3] : undefined),
+        },
       })),
     },
     options: {
-      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       plugins: {
-        title: { display: true, text: "Población municipal 1990–2040 (CONAPO; 2021+ es proyección)", font: { size: 10.5 } },
-        legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 9 } } },
+        title: { text: "Población municipal 1990–2040" },
+        subtitle: { text: "Línea continua: censos. Línea punteada: proyección CONAPO 2021–2040." },
+        legend: { position: "bottom" },
+        corteX: { indice: iCorte, etiqueta: "proyección →" },
+        tooltip: {
+          callbacks: {
+            label: (c) => ` ${c.dataset.label}: ${Number(c.parsed.y).toLocaleString("es-MX")}`,
+            afterBody: (i) => (esProyeccion(i[0].dataIndex) ? "Proyección, no dato observado" : ""),
+          },
+        },
+        fuente: { text: "Fuente: CONAPO, proyecciones de población de los municipios" },
       },
       scales: {
+        x: { ticks: { maxTicksLimit: 8, autoSkip: true } },
         y: { ticks: { callback: (v) => Number(v).toLocaleString("es-MX") } },
       },
     },

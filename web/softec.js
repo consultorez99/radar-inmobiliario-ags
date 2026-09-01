@@ -161,9 +161,12 @@ function renderShfChart() {
     label: nombre,
     data: series.find((s) => s.clave === clave).datos.map((p) => p[2]),
     borderColor: color, backgroundColor: color,
-    borderWidth: 2, pointRadius: 0, tension: 0.25, borderDash: dash || [],
+    borderWidth: dash ? 1.5 : 2, pointRadius: 0, pointHoverRadius: 3,
+    tension: 0.25, borderDash: dash || [],
   });
-  shfChartInstance = new Chart(canvas, {
+  const ultimo = base.datos[base.datos.length - 1];
+  const valorUlt = ultimo[2];
+  shfChartInstance = RadarCharts.crear(canvas, {
     type: "line",
     data: { labels, datasets: [
       ds("municipio_ags", "Aguascalientes (mpio.)", "#2f6690"),
@@ -171,12 +174,20 @@ function renderShfChart() {
       ds("nacional", "Nacional", "#9ca3af", [5, 4]),
     ] },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
       interaction: { mode: "index", intersect: false },
-      plugins: { legend: { position: "bottom", labels: { boxWidth: 14, font: { size: 10 } } } },
+      plugins: {
+        title: {
+          text: `El municipio de Aguascalientes acumula +${(valorUlt - 100).toFixed(0)}% desde 2017`,
+        },
+        subtitle: { text: `Índice de precios de vivienda, base 2017=100 · hasta ${ultimo[1]}T${String(ultimo[0]).slice(2)}` },
+        legend: { position: "bottom" },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${Number(c.parsed.y).toFixed(1)}` } },
+        fuente: { text: "Fuente: SHF, índice de precios de la vivienda en México" },
+      },
       scales: {
-        x: { ticks: { autoSkip: true, maxTicksLimit: 11, font: { size: 9 } } },
-        y: { title: { display: true, text: "Índice (2017=100)", font: { size: 10 } }, ticks: { font: { size: 9 } } },
+        x: { ticks: { autoSkip: true, maxTicksLimit: 11 } },
+        y: { ticks: { callback: (v) => Number(v).toFixed(0) } },
       },
     },
   });

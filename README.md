@@ -106,6 +106,7 @@ web/
   buffer-core.js             # núcleo de cálculo del buffer (funciones puras, probadas en tests/)
   proyectos.js               # pines de proyectos de vivienda nueva (superpuesta)
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
+  charts-theme.js            # tema común de las gráficas y su exportación a 300 DPI para el PDF
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
 tests/
   buffer.test.js             # tests del buffer: ponderación areal, límite municipal, cobertura

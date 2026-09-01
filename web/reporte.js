@@ -246,17 +246,16 @@ async function generarReportePDF() {
     pdfHeader(doc, "Composición de la zona");
     y = 30;
     const half = (CONTENT_W - 6) / 2;
-    if (zoneCharts.nse) {
-      doc.addImage(zoneCharts.nse.toBase64Image(), "PNG", MARGIN, y, half, half * 0.62, undefined, "FAST");
-    }
-    if (zoneCharts.cat) {
-      doc.addImage(zoneCharts.cat.toBase64Image(), "PNG", MARGIN + half + 6, y, half, half * 0.62, undefined, "FAST");
-    }
-    y += half * 0.62 + 10;
+    const hMitad = half * 0.62, hAncho = CONTENT_W * 0.35;
+    // alPdf redibuja cada gráfica fuera de pantalla a 300 DPI con la
+    // proporción exacta del hueco; toBase64Image() entregaba el canvas del
+    // panel (~300x170 px) y jsPDF lo estiraba a 88 mm
+    RadarCharts.alPdf(doc, zoneCharts.nse, MARGIN, y, half, hMitad);
+    RadarCharts.alPdf(doc, zoneCharts.cat, MARGIN + half + 6, y, half, hMitad);
+    y += hMitad + 10;
 
-    if (zoneCharts.pob) {
-      doc.addImage(zoneCharts.pob.toBase64Image(), "PNG", MARGIN, y, CONTENT_W, CONTENT_W * 0.35, undefined, "FAST");
-      y += CONTENT_W * 0.35 + 10;
+    if (RadarCharts.alPdf(doc, zoneCharts.pob, MARGIN, y, CONTENT_W, hAncho)) {
+      y += hAncho + 10;
     }
 
     doc.setFontSize(11);
@@ -482,14 +481,14 @@ async function generarReporteBufferPDF() {
     pdfHeader(doc, "Zona de influencia — contexto inmobiliario");
     y = 30;
     const half = (CONTENT_W - 6) / 2;
+    const hMitad = half * 0.62, hAncho = CONTENT_W * 0.35;
     if (zoneCharts.nse || zoneCharts.cat) {
-      if (zoneCharts.nse) doc.addImage(zoneCharts.nse.toBase64Image(), "PNG", MARGIN, y, half, half * 0.62, undefined, "FAST");
-      if (zoneCharts.cat) doc.addImage(zoneCharts.cat.toBase64Image(), "PNG", MARGIN + half + 6, y, half, half * 0.62, undefined, "FAST");
-      y += half * 0.62 + 10;
+      RadarCharts.alPdf(doc, zoneCharts.nse, MARGIN, y, half, hMitad);
+      RadarCharts.alPdf(doc, zoneCharts.cat, MARGIN + half + 6, y, half, hMitad);
+      y += hMitad + 10;
     }
-    if (zoneCharts.pob) {
-      doc.addImage(zoneCharts.pob.toBase64Image(), "PNG", MARGIN, y, CONTENT_W, CONTENT_W * 0.35, undefined, "FAST");
-      y += CONTENT_W * 0.35 + 10;
+    if (RadarCharts.alPdf(doc, zoneCharts.pob, MARGIN, y, CONTENT_W, hAncho)) {
+      y += hAncho + 10;
     }
 
     doc.setFontSize(11);
