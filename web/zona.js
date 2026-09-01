@@ -212,21 +212,38 @@ function renderZoneCharts(s) {
   // composición NSE (dona)
   const niveles = Object.keys(NSE_LABELS).filter((n) => s.nseCounts[n]);
   if (niveles.length) {
-    zoneCharts.nse = new Chart(document.getElementById("chart-nse"), {
+    const totalAgebs = niveles.reduce((t, n) => t + s.nseCounts[n], 0);
+    const dominante = niveles.reduce((a, b) => (s.nseCounts[b] > s.nseCounts[a] ? b : a));
+    const pctDom = Math.round((s.nseCounts[dominante] / totalAgebs) * 100);
+    zoneCharts.nse = RadarCharts.crear("chart-nse", {
       type: "doughnut",
       data: {
+        // la leyenda usa la clave corta (mismo texto que la leyenda del mapa)
+        // y el tooltip la descripción larga: en una tarjeta de ~290 px la
+        // leyenda con "C+ — Medio-alto" x7 deja la dona del tamaño de una moneda
         labels: niveles,
         datasets: [{
           data: niveles.map((n) => s.nseCounts[n]),
           backgroundColor: niveles.map((n) => NSE_COLORS[n]),
-          borderWidth: 1,
+          borderColor: "#ffffff",
+          borderWidth: 2,
+          hoverOffset: 4,
         }],
       },
       options: {
-        maintainAspectRatio: false,
+        cutout: "58%",
         plugins: {
-          title: { display: true, text: "AGEBs por nivel socioeconómico", font: { size: 11 } },
-          legend: { position: "right", labels: { boxWidth: 10, font: { size: 9 } } },
+          title: { text: `Predomina el nivel ${dominante}: ${pctDom}% de los AGEBs` },
+          subtitle: { text: `${totalAgebs} AGEBs urbanos dentro del polígono` },
+          legend: { position: "right" },
+          donaCentro: { valor: totalAgebs, etiqueta: "AGEBs" },
+          tooltip: {
+            callbacks: {
+              title: (i) => NSE_LABELS[i[0].label] || i[0].label,
+              label: (c) => ` ${c.parsed} AGEBs · ${Math.round((c.parsed / totalAgebs) * 100)}%`,
+            },
+          },
+          fuente: { text: "Fuente: INEGI, Censo 2020 · estimación de NSE propia" },
         },
       },
     });
@@ -241,17 +258,36 @@ function renderZoneCharts(s) {
       bins[b] = (bins[b] || 0) + 1;
     }
     const keys = Object.keys(bins).map(Number).sort((a, b) => a - b);
-    zoneCharts.cat = new Chart(document.getElementById("chart-cat"), {
+    zoneCharts.cat = RadarCharts.crear("chart-cat", {
       type: "bar",
       data: {
         labels: keys.map((k) => "$" + (k / 1000) + "k"),
-        datasets: [{ data: keys.map((k) => bins[k]), backgroundColor: "#3182bd" }],
+        datasets: [{
+          data: keys.map((k) => bins[k]),
+          // cada barra toma el color de su rango en la capa catastral del mapa:
+          // el histograma tiene que leerse como la misma escala que el polígono
+          backgroundColor: keys.map((k) => catColor(k + binSize / 2)),
+          borderRadius: 3,
+          maxBarThickness: 38,
+        }],
       },
       options: {
-        maintainAspectRatio: false,
         plugins: {
-          title: { display: true, text: "Colonias por valor catastral ($/m²)", font: { size: 11 } },
+          title: { text: `Mediana catastral ${fmtMXN(s.catStats.med)}/m²` },
+          subtitle: {
+            text: `${s.catStats.n} colonias · de ${fmtMXN(s.catStats.min)} a ${fmtMXN(s.catStats.max)} por m² de suelo`,
+          },
           legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (i) => {
+                const k = keys[i[0].dataIndex];
+                return `${fmtMXN(k)} – ${fmtMXN(k + binSize)} /m²`;
+              },
+              label: (c) => ` ${c.parsed.y} ${c.parsed.y === 1 ? "colonia" : "colonias"}`,
+            },
+          },
+          fuente: { text: "Fuente: Leyes de Ingresos 2026, Aguascalientes y Jesús María" },
         },
         scales: { y: { ticks: { precision: 0 } } },
       },

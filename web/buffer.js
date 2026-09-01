@@ -470,21 +470,42 @@ function renderBufferCharts(s) {
 
   const niveles = Object.keys(NSE_LABELS).filter((n) => s.demo.nsePct[n] != null);
   if (niveles.length) {
-    zoneCharts.nse = new Chart(document.getElementById("chart-nse"), {
+    const dominante = niveles.reduce((a, b) => (s.demo.nsePct[b] > s.demo.nsePct[a] ? b : a));
+    const pctDom = Math.round(s.demo.nsePct[dominante]);
+    const pobTot = Math.round(s.demo.pop || 0);
+    zoneCharts.nse = RadarCharts.crear("chart-nse", {
       type: "doughnut",
       data: {
+        // clave corta en la leyenda (igual que la leyenda del mapa), etiqueta
+        // larga en el tooltip: la tarjeta no da para siete textos completos
         labels: niveles,
         datasets: [{
           data: niveles.map((n) => Number(s.demo.nsePct[n].toFixed(1))),
           backgroundColor: niveles.map((n) => NSE_COLORS[n]),
-          borderWidth: 1,
+          borderColor: "#ffffff",
+          borderWidth: 2,
+          hoverOffset: 4,
         }],
       },
       options: {
-        maintainAspectRatio: false,
+        cutout: "58%",
         plugins: {
-          title: { display: true, text: "Población por NSE (%, interp. areal)", font: { size: 11 } },
-          legend: { position: "right", labels: { boxWidth: 10, font: { size: 9 } } },
+          title: { text: `Predomina el nivel ${dominante}: ${pctDom}% de la población` },
+          subtitle: {
+            text: `${pobTot.toLocaleString("es-MX")} habitantes estimados · interpolación areal sobre AGEBs`,
+          },
+          legend: { position: "right" },
+          donaCentro: {
+            valor: pobTot >= 1000 ? (pobTot / 1000).toFixed(1).replace(".", ",") + "k" : String(pobTot),
+            etiqueta: "hab.",
+          },
+          tooltip: {
+            callbacks: {
+              title: (i) => NSE_LABELS[i[0].label] || i[0].label,
+              label: (c) => ` ${c.parsed}% de la población`,
+            },
+          },
+          fuente: { text: "Fuente: INEGI, Censo 2020 · estimación de NSE propia" },
         },
       },
     });
@@ -499,17 +520,35 @@ function renderBufferCharts(s) {
       bins[b] = (bins[b] || 0) + 1;
     }
     const keys = Object.keys(bins).map(Number).sort((a, b) => a - b);
-    zoneCharts.cat = new Chart(document.getElementById("chart-cat"), {
+    zoneCharts.cat = RadarCharts.crear("chart-cat", {
       type: "bar",
       data: {
         labels: keys.map((k) => "$" + (k / 1000) + "k"),
-        datasets: [{ data: keys.map((k) => bins[k]), backgroundColor: "#3182bd" }],
+        datasets: [{
+          data: keys.map((k) => bins[k]),
+          // cada barra con el color de su rango en la capa catastral del mapa
+          backgroundColor: keys.map((k) => catColor(k + binSize / 2)),
+          borderRadius: 3,
+          maxBarThickness: 38,
+        }],
       },
       options: {
-        maintainAspectRatio: false,
         plugins: {
-          title: { display: true, text: "Colonias por valor catastral ($/m²)", font: { size: 11 } },
+          title: { text: `Mediana catastral ${fmtMXN(Math.round(s.catStats.med))}/m²` },
+          subtitle: {
+            text: `${s.catStats.n} colonias · de ${fmtMXN(s.catStats.min)} a ${fmtMXN(s.catStats.max)} por m² de suelo`,
+          },
           legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (i) => {
+                const k = keys[i[0].dataIndex];
+                return `${fmtMXN(k)} – ${fmtMXN(k + binSize)} /m²`;
+              },
+              label: (c) => ` ${c.parsed.y} ${c.parsed.y === 1 ? "colonia" : "colonias"}`,
+            },
+          },
+          fuente: { text: "Fuente: Leyes de Ingresos 2026, Aguascalientes y Jesús María" },
         },
         scales: { y: { ticks: { precision: 0 } } },
       },
