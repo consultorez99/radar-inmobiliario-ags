@@ -201,7 +201,7 @@ body.iso-picking #map * {
 /* gráfica del índice SHF en el panel Vivienda nueva */
 .softec-chart {
   position: relative;
-  height: 230px;
+  height: 268px;
   margin: 8px 0 4px;
 }
 
@@ -633,11 +633,14 @@ body.iso-picking #map * {
 }
 
 .zone-chart {
-  margin: 6px 0;
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 6px;
-  height: 170px;
+  margin: 8px 0;
+  /* tarjeta blanca con filete, igual que el PNG que se incrusta en el PDF:
+     el panel y el reporte tienen que verse como la misma gráfica */
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 10px 6px;
+  height: 215px;
 }
 
 .zone-report-btn {
@@ -1178,7 +1181,7 @@ body.iso-picking #map * {
     overflow-x: auto;
   }
   .zone-cards { grid-template-columns: 1fr 1fr; }
-  .zone-chart { height: 150px; }
+  .zone-chart { height: 195px; }
 
   /* ---- Modales: menos padding, más ancho útil ---- */
   .modal-backdrop { padding: 10px; }

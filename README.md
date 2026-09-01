@@ -107,6 +107,7 @@ web/
   buffer-core.js             # núcleo de cálculo del buffer (funciones puras, probadas en tests/)
   proyectos.js               # pines de proyectos de vivienda nueva (superpuesta)
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
+  charts-theme.js            # tema común de las gráficas y su exportación a 300 DPI para el PDF
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
   isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS)
   config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
