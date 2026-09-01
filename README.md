@@ -33,8 +33,9 @@ de las anteriores):
 9. **Tráfico en tiempo real** — flujo vehicular en vivo (TomTom Traffic,
    raster tiles). Única capa que no es dato oficial/abierto: es telemetría
    comercial; requiere la API key en `web/config.js` (plan gratuito de
-   TomTom, 50,000 tiles/día; restringir la key por dominio en su portal,
-   porque en una app estática queda visible en el código del sitio).
+   TomTom, 50,000 tiles/día). **Debe estar restringida por dominio** en el
+   portal de TomTom: en una app estática la clave queda visible en el código
+   del sitio. Ver "Claves de API y el proxy de ORS".
 
 Herramientas interactivas:
 
@@ -108,8 +109,15 @@ web/
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
   charts-theme.js            # tema común de las gráficas y su exportación a 300 DPI para el PDF
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
+  isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS)
+  config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
+proxy/
+  server.js                  # proxy de OpenRouteService: guarda la clave fuera del navegador
+  validar.js                 # política de qué peticiones se aceptan (funciones puras, probadas)
 tests/
   buffer.test.js             # tests del buffer: ponderación areal, límite municipal, cobertura
+  shapefile.test.js          # tests del export a shapefile: proyección UTM 13N, cajas, capas
+  proxy.test.js              # tests del proxy: sobre todo lo que DEBE rechazar
 ```
 
 ## Análisis de zona de influencia (botón "Radio")
@@ -397,6 +405,68 @@ ubicación es "exacta" (coincidencia de nombre en OSM) o "aproximada" (calle/
 comercio cercano). Es una capa superpuesta (toggle independiente), no
 exclusiva como las demás — se ve encima de cualquier capa activa.
 
+## Claves de API y el proxy de ORS
+
+El sitio es estático: **todo lo que esté en `web/` viaja al navegador y es
+visible** para cualquiera que abra el inspector. La regla del proyecto es que
+en `web/config.js` solo pueden vivir claves que el proveedor permita restringir
+por dominio. Lo que no se pueda restringir, va en el servidor.
+
+Las dos claves que usa la app caen en lados opuestos de esa regla:
+
+| Servicio | Dónde vive | Por qué |
+|---|---|---|
+| TomTom (tráfico + isócronas en Auto) | `web/config.js` | Es una clave de navegador y TomTom **sí** permite restringirla por dominio. Pública pero inservible desde otro sitio. |
+| OpenRouteService (isócronas "A pie") | Variable de entorno del proxy | ORS **no** permite restringir por dominio. En el navegador, cualquiera podía copiarla y agotar las 500 isócronas/día. |
+
+### TomTom: restringir por dominio (obligatorio)
+
+En el portal de TomTom → Dashboard → la clave → **Allowed Origins**, deben
+estar solo:
+
+```
+https://radar-inmobiliario-ags.onrender.com
+http://localhost:8000
+```
+
+Sin esa lista la clave es de uso libre para quien la copie del inspector.
+
+### ORS: el proxy (`proxy/`)
+
+Un servicio Node diminuto y sin dependencias que recibe la petición del
+navegador y la reenvía a ORS con la clave, que nunca sale del servidor.
+
+Lo importante es que **no es un reenviador ciego**: un proxy que acepta
+cualquier cosa no protege nada, solo cambia de lugar el endpoint abierto. La
+política está en `proxy/validar.js` y es deliberadamente estrecha:
+
+- el perfil de ruteo lo fija el servidor (`foot-walking`), no el cliente;
+- el punto debe caer en Aguascalientes y ~50 km alrededor;
+- máximo 3 bandas, de 1 a 30 minutos, enteras y ascendentes;
+- tope por IP (10/min) y presupuesto diario global (300/día, bajo el límite de
+  500 de ORS);
+- solo se aceptan peticiones con `Origin` en la lista blanca.
+
+Quien copie la URL del proxy solo puede calcular isócronas a pie en
+Aguascalientes con cuota acotada — no le sirve, y no te tumba el servicio.
+`tests/proxy.test.js` cubre sobre todo los casos que **deben** ser rechazados.
+
+Correrlo en local:
+
+```bash
+cd proxy
+ORS_API_KEY=tu-clave ORIGENES_PERMITIDOS=http://localhost:8000 npm start
+# y apunta ORS_PROXY_URL en web/config.js a http://localhost:8787
+```
+
+**Arranque en frío:** el proxy corre en el plan gratuito de Render, que duerme
+el servicio tras ~15 min sin tráfico; despertarlo tarda cerca de un minuto. La
+app lo mitiga mandando un `GET /salud` en cuanto se abre el panel de isócronas
+o se elige "A pie" (`isoDespertarProxy()` en `web/isocronas.js`), para que el
+arranque ocurra mientras el usuario elige el punto. Es un empujón, no una
+garantía: si el clic llega enseguida, la primera isócrona tras un rato de
+inactividad seguirá tardando. Se quita subiendo el servicio a un plan de pago.
+
 ## Despliegue en Render
 
 El sitio es 100% estático (HTML/JS/CSS + GeoJSON pre-calculado), no necesita
@@ -424,7 +494,15 @@ build ni servidor propio.
    insumos de build, no hacen falta en producción). Si necesitas regenerar
    los GeoJSON, hazlo localmente con los scripts de `scripts/` y sube los
    archivos `data/ags_*.json` resultantes.
-6. Los datos GeoJSON usan extensión `.json` (no `.geojson`) a propósito: el
+6. El **proxy de ORS** (`proxy/`) es un segundo servicio del mismo Blueprint
+   (`render.yaml`). Al aplicarlo, Render pedirá el valor de `ORS_API_KEY`
+   porque está declarada como `sync: false` — es decir, se captura en el
+   dashboard y **nunca se guarda en el repo**. Si el proxy queda en otra URL
+   que la del yaml, actualiza `ORS_PROXY_URL` en `web/config.js` y
+   `ORIGENES_PERMITIDOS` en el servicio. Sin este servicio, el modo "A pie"
+   de las isócronas se deshabilita solo con un mensaje; el resto del mapa y
+   el modo Auto siguen funcionando.
+7. Los datos GeoJSON usan extensión `.json` (no `.geojson`) a propósito: el
    CDN de Render solo comprime content-types que reconoce, y `.geojson` se
    sirve como `binary/octet-stream` sin comprimir (~9.9 MB planos vs ~3 MB
    con brotli/gzip). No renombrar a `.geojson`.

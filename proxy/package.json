@@ -1,0 +1,13 @@
+{
+  "name": "radar-inmobiliario-ags-proxy-ors",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Proxy de OpenRouteService para el modo 'A pie' de las isócronas. Guarda la clave de ORS (que no admite restricción por dominio) fuera del navegador. Sin dependencias.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -14,7 +14,9 @@
  *              libre). Clave TOMTOM_API_KEY (config.js, restringida por dominio).
  *   - A pie -> OpenRouteService (una sola llamada trae las tres bandas). TomTom
  *              no puede: su "Reachable Range" es solo motorizado y rechaza el
- *              modo a pie. Clave ORS_API_KEY (config.js, gratuita).
+ *              modo a pie. NO lleva clave en el navegador: pasa por el proxy
+ *              propio (ORS_PROXY_URL en config.js, código en proxy/), porque
+ *              la clave de ORS no admite restricción por dominio.
  *
  * El resto (banding, dibujo, conteo de conectividad) es igual sin importar el
  * motor: ambos devuelven polígonos anidados P5 ⊂ P10 ⊂ P15.
@@ -23,7 +25,7 @@
  * por categoría y proyectos de vivienda nueva) como prueba de conectividad.
  *
  * Requiere: turf (CDN), main.js (map, DATA, drawnItems*), config.js
- * (TOMTOM_API_KEY y ORS_API_KEY), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
+ * (TOMTOM_API_KEY y ORS_PROXY_URL), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
  * (PROYECTOS_SOFTEC). Es excluyente con el análisis de Radio (buffer.js) y de
  * polígono (zona.js): iniciar cualquiera limpia los otros.
  * (*drawnItems/currentZone/currentStats son globales de zona.js — scripts
@@ -114,27 +116,49 @@ function isoFetchTomtomBands(lat, lng, travelMode, minutes) {
   return Promise.all(minutes.map((m) => isoFetchTomtom(lat, lng, travelMode, m)));
 }
 
+// --------------------------------------------------- despertar el proxy
+/* El proxy corre en el plan gratuito de Render, que duerme el servicio tras
+ * ~15 min sin tráfico; despertarlo tarda cerca de un minuto. Para que ese
+ * minuto no se lo coma el usuario DESPUÉS de pedir el análisis, se manda un
+ * GET /salud en cuanto se abre el panel o se elige "A pie": el contenedor
+ * arranca mientras la persona todavía está eligiendo el punto en el mapa.
+ *
+ * Es solo un empujón, no una garantía: si el servicio estaba dormido y el
+ * clic llega enseguida, la primera isócrona del día seguirá tardando. No se
+ * espera la respuesta ni se reporta el fallo — no hay nada que el usuario
+ * pueda hacer con ese dato. */
+let isoUltimoPing = 0;
+function isoDespertarProxy() {
+  if (typeof ORS_PROXY_URL !== "string" || !ORS_PROXY_URL) return;
+  const ahora = Date.now();
+  if (ahora - isoUltimoPing < 120_000) return; // ya se despertó hace poco
+  isoUltimoPing = ahora;
+  fetch(`${ORS_PROXY_URL}/salud`, { method: "GET", mode: "cors" }).catch(() => {});
+}
+
 // ------------------------------------------------------- OpenRouteService
 // Las tres bandas (polígonos turf) en una sola llamada. ORS devuelve un
 // Feature por cada valor de `range`; cada uno es el área COMPLETA alcanzable
 // en ese tiempo (anidados: P5 ⊂ P10 ⊂ P15).
 async function isoFetchBands(lat, lng, profile, minutes) {
-  const resp = await fetch(`https://api.openrouteservice.org/v2/isochrones/${profile}`, {
+  // Va al proxy propio, no a ORS: la clave de ORS no admite restricción por
+  // dominio, así que vive en el servidor (ver proxy/ y web/config.js). El
+  // proxy arma el cuerpo real para ORS; aquí solo se manda lo mínimo.
+  const resp = await fetch(`${ORS_PROXY_URL}/isocronas`, {
     method: "POST",
-    headers: { "Authorization": ORS_API_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      locations: [[lng, lat]],
-      range: minutes.map((m) => m * 60), // segundos
-      range_type: "time",
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lat, lng, minutos: minutes, perfil: profile }),
   });
   if (!resp.ok) {
+    // El proxy contesta {error} en español y ya traducido; si por lo que sea
+    // no viene JSON, se cae a un mensaje genérico con el código.
     let detail = "";
-    try { const j = await resp.json(); detail = j?.error?.message || (typeof j?.error === "string" ? j.error : ""); } catch (e) { /* cuerpo no-JSON */ }
-    let msg = `OpenRouteService respondió ${resp.status}`;
-    if (resp.status === 401 || resp.status === 403) msg += " — clave inválida o ausente (revisa ORS_API_KEY en config.js)";
-    else if (resp.status === 429) msg += " — límite de peticiones excedido (máx. 20/min, 500/día)";
-    throw new Error(msg + (detail ? `: ${detail}` : "."));
+    try { const j = await resp.json(); detail = typeof j?.error === "string" ? j.error : ""; } catch (e) { /* cuerpo no-JSON */ }
+    if (detail) throw new Error(detail);
+    let msg = `El servicio de isócronas a pie respondió ${resp.status}`;
+    if (resp.status === 403) msg += " — el sitio no está en la lista de orígenes permitidos del proxy";
+    else if (resp.status === 503) msg += " — al proxy le falta la clave ORS_API_KEY en su entorno";
+    throw new Error(msg + ".");
   }
   const gj = await resp.json();
   const feats = (gj.features || []).slice()
@@ -296,11 +320,11 @@ function runIsocronas(lat, lng, mode, { fit = true } = {}) {
     renderIsoPanel(null, { error: "Falta la clave de TomTom en <code>config.js</code> para el modo Auto." });
     return;
   }
-  if (cfg.engine === "ors" && (typeof ORS_API_KEY !== "string" || !ORS_API_KEY)) {
+  if (cfg.engine === "ors" && (typeof ORS_PROXY_URL !== "string" || !ORS_PROXY_URL)) {
     renderIsoPanel(null, {
-      error: 'Falta la clave de OpenRouteService para el modo A pie. Regístrate gratis en ' +
-        '<a href="https://openrouteservice.org/dev/#/signup" target="_blank" rel="noopener">openrouteservice.org</a> ' +
-        'y pega tu clave en <code>ORS_API_KEY</code> (web/config.js).',
+      error: 'El modo A pie necesita el proxy de OpenRouteService. Configura ' +
+        '<code>ORS_PROXY_URL</code> en <code>web/config.js</code> con la URL del ' +
+        'servicio (ver <code>proxy/</code> y el README).',
     });
     return;
   }
@@ -385,6 +409,7 @@ btnIso.addEventListener("click", () => {
     return;
   }
   btnIso.classList.add("active");
+  isoDespertarProxy(); // el modo A pie puede necesitarlo; ver isoDespertarProxy
   // El panel muestra un análisis a la vez: quitar Radio y el polígono dibujado.
   window.clearBufferAnalysis?.(false);
   drawnItems.clearLayers();
@@ -495,6 +520,7 @@ function renderIsoPanel(s, { loading = false, error = null } = {}) {
       const m = btn.dataset.mode;
       if (m === isoMode && isoState) return;
       isoMode = m;
+      if (ISO_MODES[m]?.engine === "ors") isoDespertarProxy();
       body.querySelectorAll(".iso-mode-btn").forEach((b) => b.classList.toggle("active", b === btn));
       if (isoState) runIsocronas(isoState.lat, isoState.lng, isoMode, { fit: false });
     });
