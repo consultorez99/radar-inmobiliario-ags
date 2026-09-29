@@ -1036,6 +1036,27 @@ body.iso-picking #map * {
 
 .comp-lista { margin: 4px 0 6px; font-size: 11.5px; }
 
+/* ---------- Mis puntos (archivo del usuario) ---------- */
+.mp-estado { color: var(--text-dark); }
+.mp-estado .legend-rows { margin-top: 4px; }
+.mp-error { color: #b45309; font-weight: 600; }
+
+.mp-botones { display: flex; gap: 6px; margin: 8px 0 4px; }
+
+.mp-btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mp-btn:hover { filter: brightness(1.1); }
+.mp-btn-sec { background: var(--surface); color: var(--ink); }
+
 .iso-loading {
   margin-top: 8px;
   font-size: 12px;

@@ -11,8 +11,13 @@
  * al sitio y el reparto por tamaño (micro / pequeño / mediano o grande), y
  * pinta los competidores en el mapa a cualquier zoom.
  *
+ * Si el usuario cargó su propio archivo ("Mis puntos", mispuntos.js), el
+ * bloque también cuenta cuántos de SUS puntos caen en cada área: sucursales
+ * propias (canibalización), clientes o sitios candidatos.
+ *
  * Requiere: turf (CDN), main.js (map), competencia-core.js y
- * denue_negocios.js (denueNegData, window.denueNegListo).
+ * denue_negocios.js (denueNegData, window.denueNegListo). Opcional:
+ * mispuntos-core.js y mispuntos.js (window.MisPuntos).
  */
 
 "use strict";
@@ -25,6 +30,7 @@ const compGiros = new Set();    // índices de actividad (giro SCIAN) elegidos
 let compPendientes = null;      // nombres de giro del permalink, antes de que cargue el DENUE
 let compCtx = null;             // { slot, tipo, centro, bandas: [{ poly, pop, label }] }
 let compResultado = null;       // último cálculo (lo lee el reporte PDF)
+let compPropios = null;         // lo mismo para los puntos del usuario (Mis puntos)
 let compTotales = null;         // negocios por giro, para ordenar sugerencias
 
 const compGroup = L.featureGroup().addTo(map);
@@ -56,9 +62,8 @@ function compDentro(lat, lon, poly, bbox) {
 }
 
 /* Resumen por banda (la última es la exterior). De afuera hacia adentro:
- * un negocio fuera de la banda exterior no puede estar en las interiores. */
-function compCalcular(data, ctx) {
-  let candidatos = CompetenciaCore.negociosDeGiros(data, compGiros);
+ * un punto fuera de la banda exterior no puede estar en las interiores. */
+function compPorBandas(candidatos, ctx) {
   const bandas = new Array(ctx.bandas.length);
   for (let i = ctx.bandas.length - 1; i >= 0; i--) {
     const b = ctx.bandas[i];
@@ -69,12 +74,28 @@ function compCalcular(data, ctx) {
       ...CompetenciaCore.resumenCompetencia(candidatos, { pop: b.pop, centro: ctx.centro }),
     };
   }
+  return bandas;
+}
+
+function compCalcular(data, ctx) {
   return {
     tipo: ctx.tipo,
     giros: [...compGiros].map((i) => data.actividades[i]),
     centro: ctx.centro,
-    bandas,
+    bandas: compPorBandas(CompetenciaCore.negociosDeGiros(data, compGiros), ctx),
     corte: data.meta.corte,
+  };
+}
+
+function compCalcularPropios(ctx) {
+  if (!window.MisPuntos?.hayDatos()) return null;
+  const bandas = compPorBandas(window.MisPuntos.puntos(), ctx);
+  const ext = bandas[bandas.length - 1];
+  return {
+    archivo: window.MisPuntos.archivo(),
+    centro: ctx.centro,
+    bandas,
+    porGrupo: MisPuntosCore.conteoPorGrupo(ext.lista),
   };
 }
 
@@ -145,6 +166,26 @@ function compResultadosHTML(res) {
       orientativa. Distancias en línea recta, no por calle.</div>`;
 }
 
+function compPropiosHTML(p) {
+  const ext = p.bandas[p.bandas.length - 1];
+  const conteo = p.bandas.length > 1
+    ? p.bandas.map((b) => `${compEsc(b.label)}: <strong>${b.n}</strong>`).join(" · ")
+    : `<strong>${ext.n}</strong> en ${compEsc(ext.label)}`;
+  const grupos = Object.keys(p.porGrupo).length > 1 || !p.porGrupo["Sin grupo"]
+    ? `<div class="comp-linea">${Object.entries(p.porGrupo)
+        .map(([g, n]) => `<span class="legend-dot" style="background:${window.MisPuntos.color({ grupo: g })}"></span>${compEsc(g)} ${n}`)
+        .join(" · ")}</div>`
+    : "";
+  const lista = ext.lista.slice(0, 5).map((c) => `
+    <div class="bf-proy-row"><span class="legend-dot" style="background:${window.MisPuntos.color(c)}"></span>
+      ${compEsc(c.nombre)} <span class="bf-pdu-prog">${c.distKm != null ? compKm(c.distKm) : ""}</span></div>`).join("");
+  return `
+    <div class="zone-list"><strong>Tus puntos</strong> <span class="bf-pdu-prog">${compEsc(p.archivo)}</span></div>
+    <div class="comp-linea">${conteo}</div>
+    ${ext.n ? grupos : ""}
+    ${lista ? `<div class="comp-lista">${lista}${ext.n > 5 ? `<div class="bf-more">… y ${ext.n - 5} más</div>` : ""}</div>` : ""}`;
+}
+
 function compRender() {
   const ctx = compCtx;
   if (!ctx || !ctx.slot.isConnected) return;
@@ -164,6 +205,7 @@ function compRender() {
     </span>`).join("");
 
   compResultado = compGiros.size ? compCalcular(data, ctx) : null;
+  compPropios = compCalcularPropios(ctx);
   compDibujar(compResultado);
 
   ctx.slot.innerHTML = `
@@ -177,7 +219,8 @@ function compRender() {
       </div>` : ""}
     ${compResultado ? compResultadosHTML(compResultado)
       : `<div class="iso-sub">Elige el giro de tu negocio para contar competidores dentro del área,
-          ver el más cercano y qué tan saturada está la zona.</div>`}`;
+          ver el más cercano y qué tan saturada está la zona.</div>`}
+    ${compPropios ? compPropiosHTML(compPropios) : ""}`;
 
   compConectar(ctx, data);
 }
@@ -237,9 +280,13 @@ window.Competencia = {
   limpiar() {
     compCtx = null;
     compResultado = null;
+    compPropios = null;
     compGroup.clearLayers();
   },
+  // recalcular con el área ya montada (p. ej. al cargar o quitar Mis puntos)
+  refrescar() { if (compCtx) compRender(); },
   resultado: () => compResultado,
+  propios: () => compPropios,
   // para el permalink: nombres (estables entre regeneraciones del DENUE), no índices
   nombresGiros() {
     const data = compDatos();

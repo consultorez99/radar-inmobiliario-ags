@@ -309,7 +309,8 @@ async function generarReportePDF() {
  * Devuelve la y final. */
 function seccionCompetenciaPDF(doc, y, salto) {
   const res = window.Competencia?.resultado();
-  if (!res) return y;
+  const prop = window.Competencia?.propios();
+  if (!res && !prop) return y;
   const need = (mm) => { if (y + mm > 272) y = salto(); };
   const fmt = (n) => (n == null ? "—" : Math.round(n).toLocaleString("es-MX"));
   // Solo caracteres WinAnsi en todo lo que va al PDF: las fuentes base de
@@ -323,6 +324,7 @@ function seccionCompetenciaPDF(doc, y, salto) {
     doc.text(lines, MARGIN + 2, y);
     y += lines.length * size * 0.46 + extra;
   };
+  if (!res) return seccionPropiosPDF();
   const ext = res.bandas[res.bandas.length - 1];
 
   need(40);
@@ -388,7 +390,32 @@ function seccionCompetenciaPDF(doc, y, salto) {
   linea(`DENUE corte ${res.corte} contra población del Censo 2020: la saturación (habitantes por negocio) es orientativa. ` +
     "Distancias en línea recta, no por calle. El DENUE registra establecimientos, no ventas ni afluencia.", 8, 1.6);
   doc.setTextColor(40, 40, 40);
-  return y + 4;
+  y += 4;
+  return prop ? seccionPropiosPDF() : y;
+
+  // Puntos del archivo del usuario (Mis puntos): conteo por banda, por grupo
+  // y los más cercanos. Comparte `y`, `need` y `linea` con la sección de arriba.
+  function seccionPropiosPDF() {
+    const pe = prop.bandas[prop.bandas.length - 1];
+    need(24);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("Puntos propios (archivo del usuario)", MARGIN, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    linea(`Archivo: ${prop.archivo}.`, 8.5);
+    linea(prop.bandas.map((b) => `${b.label.replace("≤", "hasta ")}: ${b.n}`).join("   ·   "), 9.5);
+    const grupos = Object.entries(prop.porGrupo);
+    if (pe.n && (grupos.length > 1 || !prop.porGrupo["Sin grupo"])) {
+      linea("Por tipo: " + grupos.map(([g, n]) => `${g} ${n}`).join(" · ") + ".");
+    }
+    for (const c of pe.lista.slice(0, 10)) {
+      linea(`· ${c.nombre}${c.distKm != null ? ` — ${km(c.distKm)}` : ""}`, 8.5, 0.8);
+    }
+    if (pe.n > 10) linea(`… y ${pe.n - 10} más.`, 8.5);
+    return y + 4;
+  }
 }
 
 /* ------------------------------------------------------------------------

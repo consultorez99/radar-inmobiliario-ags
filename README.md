@@ -57,7 +57,8 @@ Herramientas interactivas:
 - **Geomarketing**: las isócronas calculan el mercado alcanzable (población y
   hogares por segmento NSE en cada banda de tiempo) y los tres análisis
   (radio, isócronas, polígono) traen un bloque de **competencia** por giro
-  DENUE. Ver "Geomarketing" abajo.
+  DENUE. Con "Mis puntos" se cargan las sucursales o clientes propios (CSV,
+  Excel o GeoJSON, sin salir del navegador). Ver "Geomarketing" abajo.
 - Panel de capas, leyendas flotantes y modal "Acerca de".
 
 > ⚠️ **Proyecto independiente.** Sin afiliación con RadarMX, AMAI ni otros proveedores comerciales de datos.
@@ -116,6 +117,8 @@ web/
   isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS) + mercado alcanzable
   competencia.js             # bloque "Competencia" (DENUE por giro) que montan radio, isócronas y polígono
   competencia-core.js        # núcleo de competencia: búsqueda de giros, saturación, tamaños (puro, probado en tests/)
+  mispuntos.js               # "Mis puntos": archivo del usuario (CSV/Excel/GeoJSON) en el mapa y en los análisis
+  mispuntos-core.js          # lectura del archivo: CSV con comillas, columnas lat/lon, descartes con motivo (puro)
   config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
 proxy/
   server.js                  # proxy de OpenRouteService: guarda la clave fuera del navegador
@@ -125,6 +128,7 @@ tests/
   shapefile.test.js          # tests del export a shapefile: proyección UTM 13N, cajas, capas
   proxy.test.js              # tests del proxy: sobre todo lo que DEBE rechazar
   competencia.test.js        # tests de competencia: búsqueda de giros, tamaños, saturación, DENUE real
+  mispuntos.test.js          # tests de lectura de archivos: Excel en español, comillas, coordenadas invertidas
 ```
 
 ## Análisis de zona de influencia (botón "Radio")
@@ -189,6 +193,23 @@ viajan en el permalink (`&giro=Nombre|Nombre`, por nombre y no por índice
 para sobrevivir a una regeneración del DENUE) y la sección entra en los tres
 reportes PDF. El giro elegido se conserva al cambiar de radio a isócrona o a
 polígono, para comparar sitios con el mismo criterio.
+
+**Mis puntos (datos del cliente).** Botón "Mis puntos" en la barra de capas:
+carga un CSV, Excel (.xlsx) o GeoJSON con sucursales, clientes o sitios
+candidatos. Requiere columnas de coordenadas (`lat`/`lon`, `latitud`/
+`longitud` o `X`/`Y`); `nombre` y `tipo` son opcionales (`tipo` colorea hasta 6
+grupos). Acepta el CSV que guarda Excel en español (punto y coma, coma
+decimal, Windows-1252); corrige latitud/longitud invertidas y descarta — con
+el renglón y el motivo — lo que no tiene coordenadas válidas en México, en
+vez de adivinar. No hay geocodificación de direcciones: Nominatim solo
+permite 1 petición por segundo y no está pensado para listas.
+
+Con un archivo cargado, el bloque de competencia de cada análisis cuenta
+cuántos de esos puntos caen en el área (por banda en las isócronas), por
+tipo y los más cercanos al sitio, y lo lleva al PDF. **El archivo se lee en
+el navegador y nunca se envía a ningún servidor ni se guarda**; al recargar
+se pierde y no viaja en el permalink. Excel se lee con SheetJS, que se
+descarga de cdnjs solo al abrir un .xlsx.
 
 ## Fuentes de datos
 
