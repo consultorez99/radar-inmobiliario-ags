@@ -245,6 +245,7 @@ window.getBufferStats = () => bufferStats;
 window.clearBufferAnalysis = function (hidePanel = true) {
   bufferGroup.clearLayers();
   bufferStats = null;
+  window.Competencia?.limpiar();
   stopBufferPicking();
   document.getElementById("btn-buffer").classList.remove("active");
   document.getElementById("btn-csv").classList.add("hidden");
@@ -408,6 +409,7 @@ function bufferResultsHTML(s) {
       <span>3+ cuartos <strong>${bfPct(d.pct3cuart)}</strong></span>
     </div>
     <div class="zone-list"><strong>NSE (% de población):</strong><br>${nseRows || "s/d"}</div>
+    <div class="comp-slot"></div>
     <div class="zone-list"><strong>Valor catastral suelo 2026</strong>
       ${s.catStats ? `· ${s.catStats.n} colonias · min ${fmtMXN(s.catStats.min)} ·
       mediana ${fmtMXN(Math.round(s.catStats.med))} · max ${fmtMXN(s.catStats.max)} /m²` : ""}
@@ -471,6 +473,13 @@ function renderBufferPanel(s) {
   });
 
   renderBufferCharts(s);
+  if (s) {
+    window.Competencia?.montar(el.querySelector(".comp-slot"), {
+      tipo: "radio",
+      centro: { lat: s.lat, lng: s.lng },
+      bandas: [{ poly: bufferCircle(s.lat, s.lng, s.radiusKm), pop: s.demo.pop, label: `${s.radiusKm} km` }],
+    });
+  }
 }
 
 function renderBufferCharts(s) {

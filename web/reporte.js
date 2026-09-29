@@ -232,7 +232,7 @@ async function generarReportePDF() {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 40, 40);
       const pobTxt = Object.entries(s.poblacionMunicipios.municipios)
-        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020 a ${v.anioComparacionFin})`)
         .join(" · ");
       doc.text(pobTxt, MARGIN, y + 4.5, { maxWidth: CONTENT_W });
       y += 10;
@@ -280,6 +280,12 @@ async function generarReportePDF() {
       doc.text(fmtMXN(c.valor_m2), MARGIN + CONTENT_W - 2, y, { align: "right" });
     }
 
+    // competencia: página propia (las dos anteriores ya van llenas)
+    if (window.Competencia?.resultado()) {
+      const nueva = () => { doc.addPage(); pdfHeader(doc, "Competencia en la zona"); return 30; };
+      seccionCompetenciaPDF(doc, nueva(), nueva);
+    }
+
     const pages = doc.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
@@ -292,6 +298,97 @@ async function generarReportePDF() {
     btn.disabled = false;
     btn.textContent = "Generar reporte PDF";
   }
+}
+
+/* Sección "Competencia" (competencia.js) para los tres reportes: radio,
+ * isócronas y polígono. Lee el último cálculo del bloque del panel, así que
+ * el PDF dice exactamente lo que se vio en pantalla. Si no se eligió ningún
+ * giro, no escribe nada.
+ *   y:     posición actual
+ *   salto: agrega una página con encabezado y devuelve la y inicial
+ * Devuelve la y final. */
+function seccionCompetenciaPDF(doc, y, salto) {
+  const res = window.Competencia?.resultado();
+  if (!res) return y;
+  const need = (mm) => { if (y + mm > 272) y = salto(); };
+  const fmt = (n) => (n == null ? "—" : Math.round(n).toLocaleString("es-MX"));
+  // Solo caracteres WinAnsi en todo lo que va al PDF: las fuentes base de
+  // jsPDF no traen "≤" ni "→", y uno solo de ellos descompone el renglón entero.
+  const km = (d) => (d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`);
+  const linea = (txt, size = 9, extra = 1.2) => {
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(txt, CONTENT_W - 4);
+    need(lines.length * size * 0.46 + extra);
+    doc.setFontSize(size);
+    doc.text(lines, MARGIN + 2, y);
+    y += lines.length * size * 0.46 + extra;
+  };
+  const ext = res.bandas[res.bandas.length - 1];
+
+  need(40);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 40, 40);
+  doc.text("Competencia (DENUE, INEGI)", MARGIN, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  linea(`Giros analizados: ${res.giros.join("; ")}.`, 8.5);
+
+  if (res.bandas.length > 1) {
+    y += 3;
+    doc.setFontSize(8.5);
+    doc.setFillColor(250, 232, 255);
+    doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.text("Indicador", MARGIN + 2, y);
+    // "≤" no existe en las fuentes base de jsPDF y descompone el renglón entero
+    res.bandas.forEach((b, i) => doc.text(b.label.replace("≤", "hasta "), MARGIN + 100 + i * 30, y, { align: "right" }));
+    doc.setFont("helvetica", "normal");
+    for (const [label, fn] of [["Competidores", (b) => String(b.n)], ["Habitantes por negocio", (b) => fmt(b.habPorNegocio)]]) {
+      y += 5.5;
+      doc.text(label, MARGIN + 2, y);
+      res.bandas.forEach((b, i) => doc.text(fn(b), MARGIN + 100 + i * 30, y, { align: "right" }));
+    }
+    y += 6;
+  } else {
+    linea(`Competidores en ${ext.label}: ${ext.n}   ·   Habitantes por negocio: ${fmt(ext.habPorNegocio)}`, 9.5);
+  }
+  if (ext.masCercano) {
+    linea(`Más cercano al sitio: ${ext.masCercano.nombre}, a ${km(ext.masCercano.distKm)} en línea recta.`);
+  }
+  if (ext.n) {
+    const t = ext.porTamano;
+    linea(`Por tamaño: micro (hasta 10 personas) ${t.micro} · pequeño (11–50) ${t.pequeno} · mediano o grande (51+) ${t.grande}.`);
+  }
+
+  const maxLista = 15;
+  if (ext.n) {
+    y += 2;
+    need(12);
+    doc.setFontSize(8.5);
+    doc.setFillColor(250, 232, 255);
+    doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.text("Negocio", MARGIN + 2, y);
+    doc.text("Tamaño", MARGIN + 110, y);
+    if (res.centro) doc.text("Distancia", MARGIN + CONTENT_W - 2, y, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    for (const c of ext.lista.slice(0, maxLista)) {
+      y += 5;
+      need(5);
+      doc.setFontSize(8.5);
+      doc.text(c.nombre.length > 60 ? c.nombre.slice(0, 58) + "…" : c.nombre, MARGIN + 2, y);
+      doc.text(c.tamano || "", MARGIN + 110, y);
+      if (c.distKm != null) doc.text(km(c.distKm), MARGIN + CONTENT_W - 2, y, { align: "right" });
+    }
+    y += 5;
+    if (ext.n > maxLista) linea(`… y ${ext.n - maxLista} negocios más.`, 8.5);
+  }
+  doc.setTextColor(110, 100, 130);
+  linea(`DENUE corte ${res.corte} contra población del Censo 2020: la saturación (habitantes por negocio) es orientativa. ` +
+    "Distancias en línea recta, no por calle. El DENUE registra establecimientos, no ventas ni afluencia.", 8, 1.6);
+  doc.setTextColor(40, 40, 40);
+  return y + 4;
 }
 
 /* ------------------------------------------------------------------------
@@ -573,6 +670,8 @@ async function generarReporteBufferPDF() {
     }
     y += 6;
 
+    y = seccionCompetenciaPDF(doc, y, () => { salto(); return y; });
+
     need(14);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -595,7 +694,7 @@ async function generarReporteBufferPDF() {
     parrafo(
       s.poblacionMunicipios
         ? Object.entries(s.poblacionMunicipios.municipios)
-            .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+            .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020 a ${v.anioComparacionFin})`)
             .join("   ·   ") +
           "  (dato del municipio completo, no específico del radio — ver gráfica)"
         : "s/d",
@@ -731,7 +830,7 @@ async function generarReporteIsocronasPDF() {
       doc.setFillColor(232, 240, 246);
       doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
       doc.text("Indicador", MARGIN + 2, y);
-      mins.forEach((mm, i) => doc.text(`≤ ${mm} min`, MARGIN + 100 + i * 30, y, { align: "right" }));
+      mins.forEach((mm, i) => doc.text(`hasta ${mm} min`, MARGIN + 100 + i * 30, y, { align: "right" }));
       doc.setFont("helvetica", "normal");
       for (const [label, fn] of filasMerc) {
         y += 5.5;
@@ -748,6 +847,9 @@ async function generarReporteIsocronasPDF() {
       }
       y += 5;
     }
+
+    // ---------------- competencia (si se eligió un giro) ----------------
+    y = seccionCompetenciaPDF(doc, y, () => { salto(); return y; });
 
     // ---------------- servicios alcanzables (POIs) ----------------
     const r = s.reach;
@@ -767,7 +869,7 @@ async function generarReporteIsocronasPDF() {
       doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
       doc.setFont("helvetica", "bold");
       doc.text("Categoría", MARGIN + 2, y);
-      mins.forEach((m, i) => doc.text(`≤ ${m} min`, MARGIN + 75 + i * 35, y, { align: "right" }));
+      mins.forEach((m, i) => doc.text(`hasta ${m} min`, MARGIN + 75 + i * 35, y, { align: "right" }));
       doc.setFont("helvetica", "normal");
       for (const [cat, conteos] of filas) {
         y += 5.5;

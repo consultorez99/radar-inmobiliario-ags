@@ -54,6 +54,10 @@ Herramientas interactivas:
   direcciones comparte el análisis tal cual se ve
   (`#map=13/21.88/-102.29&capa=pdu&buf=21.88,-102.29,1.5`). Ver
   `web/permalink.js`.
+- **Geomarketing**: las isócronas calculan el mercado alcanzable (población y
+  hogares por segmento NSE en cada banda de tiempo) y los tres análisis
+  (radio, isócronas, polígono) traen un bloque de **competencia** por giro
+  DENUE. Ver "Geomarketing" abajo.
 - Panel de capas, leyendas flotantes y modal "Acerca de".
 
 > ⚠️ **Proyecto independiente.** Sin afiliación con RadarMX, AMAI ni otros proveedores comerciales de datos.
@@ -109,7 +113,9 @@ web/
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
   charts-theme.js            # tema común de las gráficas y su exportación a 300 DPI para el PDF
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
-  isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS)
+  isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS) + mercado alcanzable
+  competencia.js             # bloque "Competencia" (DENUE por giro) que montan radio, isócronas y polígono
+  competencia-core.js        # núcleo de competencia: búsqueda de giros, saturación, tamaños (puro, probado en tests/)
   config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
 proxy/
   server.js                  # proxy de OpenRouteService: guarda la clave fuera del navegador
@@ -118,6 +124,7 @@ tests/
   buffer.test.js             # tests del buffer: ponderación areal, límite municipal, cobertura
   shapefile.test.js          # tests del export a shapefile: proyección UTM 13N, cajas, capas
   proxy.test.js              # tests del proxy: sobre todo lo que DEBE rechazar
+  competencia.test.js        # tests de competencia: búsqueda de giros, tamaños, saturación, DENUE real
 ```
 
 ## Análisis de zona de influencia (botón "Radio")
@@ -149,6 +156,39 @@ Los resultados se cachean por (punto, radio). El cálculo corre 100% en el
 navegador con el mismo turf.js del CDN. Los tests (`npm install && npm test`,
 solo devDependencies) cubren la ponderación areal, un buffer que cruza el
 límite municipal Aguascalientes/Jesús María y el % de cobertura sin AGEB.
+
+## Geomarketing: mercado alcanzable y competencia
+
+**Mercado alcanzable (isócronas).** Cada banda de tiempo (p. ej. 5/10/15 min
+en auto) calcula población, viviendas habitadas y viviendas por segmento NSE
+— alto (A/B, C+), medio (C, C-), bajo (D+, D, E) — con **la misma
+interpolación areal que el radio** (`agebsEnPoligono()` en `web/buffer.js`,
+`resumenMercado()` en `web/buffer-core.js`). Los conteos son acumulados: la
+banda de 10 min incluye a la de 5. Los segmentos se agrupan en tres bloques a
+propósito: el NSE es un proxy por AGEB y no da para presumir precisión nivel
+por nivel. Si más del 25% de la banda exterior no tiene AGEB 2020, el panel y
+el PDF advierten que la población está subestimada.
+
+**Competencia (radio, isócronas y polígono).** Cada panel de análisis trae un
+bloque "Competencia" donde se eligen hasta 5 giros del DENUE (búsqueda por
+nombre SCIAN, con sinónimos de uso común: "gimnasio" → centros de
+acondicionamiento físico, "estética" → salones de belleza, etc.). Por área
+calcula:
+
+- **Competidores** dentro del área (por banda en las isócronas).
+- **Habitantes por negocio** — población estimada del área ÷ competidores.
+  Más alto = menos saturado. Es orientativo: cruza DENUE (corte reciente)
+  con población del Censo 2020.
+- **Más cercano** al sitio y lista ordenada por distancia (en línea recta, no
+  por calle). En el polígono libre no hay "sitio", así que no hay distancias.
+- **Por tamaño** (personal ocupado según DENUE): micro ≤10, pequeño 11–50,
+  mediano o grande 51+ — separa a la tiendita de la cadena.
+
+Los competidores se pintan en magenta en el mapa a cualquier zoom, los giros
+viajan en el permalink (`&giro=Nombre|Nombre`, por nombre y no por índice
+para sobrevivir a una regeneración del DENUE) y la sección entra en los tres
+reportes PDF. El giro elegido se conserva al cambiar de radio a isócrona o a
+polígono, para comparar sitios con el mismo criterio.
 
 ## Fuentes de datos
 

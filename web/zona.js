@@ -45,6 +45,7 @@ function clearZone() {
   drawnItems.clearLayers();
   currentZone = null;
   currentStats = null;
+  window.Competencia?.limpiar();
   window.clearBufferAnalysis?.(false);
   document.getElementById("btn-csv").classList.add("hidden");
   document.getElementById("btn-json").classList.add("hidden");
@@ -189,6 +190,7 @@ function renderZonePanel(s) {
       <div class="zone-card"><div class="zc-label">Viviendas 3+ cuartos</div>
         <div class="zc-value">${s.pct3cuart != null ? s.pct3cuart.toFixed(0) + "%" : "s/d"}</div></div>
     </div>
+    <div class="comp-slot"></div>
     <div class="zone-list"><strong>Mercado:</strong><br>${priceTxt}</div>
     <div class="zone-list"><strong>Uso de suelo (PDU):</strong> ${pduTxt}</div>
     <div class="zone-list"><strong>Proyección de población (CONAPO)</strong> — dato del municipio
@@ -202,6 +204,12 @@ function renderZonePanel(s) {
   document.getElementById("btn-shp").classList.remove("hidden");
   document.getElementById("zone-panel").classList.remove("hidden");
   renderZoneCharts(s);
+  // sin centro: en un polígono libre no hay "sitio" desde el cual medir distancias
+  window.Competencia?.montar(el.querySelector(".comp-slot"), {
+    tipo: "poligono",
+    centro: null,
+    bandas: [{ poly: currentZone, pop: s.pop, label: "la zona" }],
+  });
 }
 
 function renderZoneCharts(s) {

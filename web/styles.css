@@ -950,6 +950,92 @@ body.iso-picking #map * {
 }
 .iso-mercado .iso-sub { margin: 0 0 0 12px; }
 
+/* ---------- Competencia (bloque dentro de radio / isócronas / polígono) ---------- */
+.comp-slot { margin-top: 4px; }
+
+.comp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 6px;
+}
+
+.comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: #fae8ff;
+  color: #86198f;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.comp-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.comp-chip-x {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.comp-chip-x:hover { background: #f5d0fe; }
+
+.comp-buscar { position: relative; margin-bottom: 6px; }
+
+.comp-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.comp-input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+.comp-sugerencias {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.comp-sug {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.comp-sug:hover { background: var(--surface-hover); }
+
+.comp-sug-vacio { padding: 8px; font-size: 11px; color: var(--muted); }
+
+.comp-linea { font-size: 11.5px; margin: 4px 0; }
+
+.comp-lista { margin: 4px 0 6px; font-size: 11.5px; }
+
 .iso-loading {
   margin-top: 8px;
   font-size: 12px;

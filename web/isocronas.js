@@ -389,6 +389,7 @@ window.getIsoState = () => isoState;
 window.clearIsocronas = function (hidePanel = true) {
   isoGroup.clearLayers();
   isoState = null;
+  window.Competencia?.limpiar();
   stopIsoPicking();
   document.getElementById("btn-iso").classList.remove("active", "loading");
   document.getElementById("btn-iso-report").classList.add("hidden");
@@ -553,6 +554,7 @@ function isoResultsHTML(s) {
   return `
     <div class="zone-cards iso-cards">${cards}</div>
     ${mercadoBlock}
+    <div class="comp-slot"></div>
     ${poiBlock}
     ${proyBlock}
     <div class="zone-note">${s.mode === "car"
@@ -578,6 +580,17 @@ function renderIsoPanel(s, { loading = false, error = null } = {}) {
   // Exportaciones: solo con un análisis terminado (durante la carga `s` es el
   // resultado anterior, que ya no corresponde a lo dibujado).
   const hayResultados = !!s && !loading && !error;
+  if (hayResultados) {
+    window.Competencia?.montar(body.querySelector(".comp-slot"), {
+      tipo: "isocronas",
+      centro: { lat: s.lat, lng: s.lng },
+      bandas: s.bands.map((b, i) => ({
+        poly: b.full,
+        pop: s.mercado?.[i]?.pop ?? null,
+        label: `≤${b.min}${i === s.bands.length - 1 ? " min" : ""}`,
+      })),
+    });
+  }
   document.getElementById("btn-iso-report").classList.toggle("hidden", !hayResultados);
   document.getElementById("btn-iso-png").classList.toggle("hidden", !hayResultados);
 
