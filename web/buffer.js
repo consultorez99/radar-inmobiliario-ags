@@ -46,6 +46,35 @@ function bboxesOverlap(a, b) {
   return !(a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1]);
 }
 
+/* AGEBs que tocan un polígono, cada una con la fracción de su área que cae
+ * dentro (la base de la interpolación areal). La comparten el radio y las
+ * isócronas para que ambos cuenten la población exactamente igual.
+ * `candidatas` permite acotar la búsqueda: con bandas anidadas, una AGEB que
+ * no toca la banda exterior tampoco toca las interiores. */
+function agebsEnPoligono(poly, candidatas = DATA.agebs.features) {
+  const polyBbox = turf.bbox(poly);
+  const rows = [];
+  let areaKm2 = 0;
+  for (const f of candidatas) {
+    if (!bboxesOverlap(featureBbox(f), polyBbox)) continue;
+    let inter = null;
+    try { inter = turf.intersect(poly, f); } catch (err) { continue; }
+    if (!inter) continue;
+    const aIn = turf.area(inter) / 1e6;
+    if (!(aIn > 0)) continue;
+    if (f.__areaKm2 == null) f.__areaKm2 = turf.area(f) / 1e6;
+    const aTot = f.__areaKm2;
+    rows.push({
+      frac: aTot > 0 ? Math.min(1, aIn / aTot) : 0,
+      areaKm2: aIn,
+      props: f.properties,
+      feature: f,
+    });
+    areaKm2 += aIn;
+  }
+  return { rows, areaKm2 };
+}
+
 function analyzeBuffer(lat, lng, radiusKm) {
   const key = `${lat.toFixed(6)}|${lng.toFixed(6)}|${radiusKm}`;
   if (bufferCache.has(key)) return bufferCache.get(key);
@@ -56,24 +85,7 @@ function analyzeBuffer(lat, lng, radiusKm) {
   const centerPt = turf.point([lng, lat]);
 
   // AGEBs: intersección con fracción de área (interpolación areal)
-  const agebRows = [];
-  let agebAreaKm2 = 0;
-  for (const f of DATA.agebs.features) {
-    if (!bboxesOverlap(featureBbox(f), circleBbox)) continue;
-    let inter = null;
-    try { inter = turf.intersect(circle, f); } catch (err) { continue; }
-    if (!inter) continue;
-    const aIn = turf.area(inter) / 1e6;
-    if (!(aIn > 0)) continue;
-    const aTot = turf.area(f) / 1e6;
-    agebRows.push({
-      frac: aTot > 0 ? Math.min(1, aIn / aTot) : 0,
-      areaKm2: aIn,
-      props: f.properties,
-      feature: f,
-    });
-    agebAreaKm2 += aIn;
-  }
+  const { rows: agebRows, areaKm2: agebAreaKm2 } = agebsEnPoligono(circle);
   const demo = BufferCore.aggregateDemographics(agebRows);
   const pctSinAgeb = BufferCore.coverageSinAgeb(agebAreaKm2, areaKm2);
 

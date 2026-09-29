@@ -709,6 +709,46 @@ async function generarReporteIsocronasPDF() {
     y = await capturaMapaPDF(doc, y);
     y += 9;
 
+    // ---------------- mercado alcanzable (Censo 2020) ----------------
+    if (s.mercado) {
+      const m = s.mercado;
+      const pct = (n) => (n == null ? "" : ` (${Math.round(n)}%)`);
+      const filasMerc = [
+        ["Población", (b) => fmt(b.pop)],
+        ["Viviendas habitadas", (b) => fmt(b.viviendas)],
+        ["Viviendas NSE alto (A/B, C+)", (b) => fmt(b.segmentos.viv.alto) + pct(b.segmentos.pct.alto)],
+        ["Viviendas NSE medio (C, C-)", (b) => fmt(b.segmentos.viv.medio) + pct(b.segmentos.pct.medio)],
+        ["Viviendas NSE bajo (D+, D, E)", (b) => fmt(b.segmentos.viv.bajo) + pct(b.segmentos.pct.bajo)],
+        ["NSE predominante", (b) => b.nivelPred || "—"],
+        ["Con automóvil", (b) => (b.pctAuto == null ? "s/d" : `${Math.round(b.pctAuto)}%`)],
+      ];
+      need(14 + filasMerc.length * 5.5);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Mercado alcanzable (Censo 2020, conteo acumulado)", MARGIN, y);
+      y += 5;
+      doc.setFontSize(8.5);
+      doc.setFillColor(232, 240, 246);
+      doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+      doc.text("Indicador", MARGIN + 2, y);
+      mins.forEach((mm, i) => doc.text(`≤ ${mm} min`, MARGIN + 100 + i * 30, y, { align: "right" }));
+      doc.setFont("helvetica", "normal");
+      for (const [label, fn] of filasMerc) {
+        y += 5.5;
+        doc.text(label, MARGIN + 2, y);
+        m.forEach((b, i) => doc.text(fn(b), MARGIN + 100 + i * 30, y, { align: "right" }));
+      }
+      y += 6;
+      const ext = m[m.length - 1];
+      if (ext.pctSinAgeb != null && ext.pctSinAgeb > 25) {
+        doc.setTextColor(160, 80, 20);
+        parrafo(`El ${Math.round(ext.pctSinAgeb)}% del área de ${maxMin} min no tiene AGEB urbana 2020 ` +
+          "(fraccionamientos nuevos o zona rural): la población alcanzable está subestimada.", MARGIN, 8, 1.2);
+        doc.setTextColor(40, 40, 40);
+      }
+      y += 5;
+    }
+
     // ---------------- servicios alcanzables (POIs) ----------------
     const r = s.reach;
     need(20);
@@ -780,6 +820,7 @@ async function generarReporteIsocronasPDF() {
         : "Modo A pie: contorno calculado con OpenRouteService sobre la red vial de OpenStreetMap, a velocidad de caminata.",
       "Cada banda es el área alcanzable en N minutos o menos desde el punto, puerta a puerta. El contorno se suaviza para su presentación, sin alterar el alcance calculado.",
       "Los tiempos son estimaciones sin tráfico en vivo: sirven para comparar la conectividad entre zonas, no como hora de llegada de un viaje concreto.",
+      "Mercado alcanzable: Censo 2020 (INEGI, AGEB urbana) por interpolación areal — cada AGEB aporta la fracción de su área dentro de la banda, asumiendo distribución uniforme. Segmentos con el NSE estimado propio (no la regla AMAI). Es una estimación, no un conteo.",
       "Puntos de interés: OpenStreetMap (ODbL). Proyectos de vivienda nueva: estudio de mercado de terceros, corte 1T26.",
       "Este reporte NO es un avalúo.",
     ];

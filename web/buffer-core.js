@@ -125,6 +125,50 @@
     return Math.min(100, Math.max(0, (1 - agebAreaKm2 / bufferAreaKm2) * 100));
   }
 
+  /* Segmentos de mercado por NSE: la pregunta de geomarketing no es "qué nivel
+   * predomina" sino "cuánta gente de mi segmento objetivo alcanzo". Tres
+   * grupos gruesos a propósito: el NSE es un proxy por AGEB, y sumarlo en
+   * bloques es más honesto que presumir precisión nivel por nivel. */
+  const NSE_SEGMENTOS = {
+    alto: ["A/B", "C+"],
+    medio: ["C", "C-"],
+    bajo: ["D+", "D", "E"],
+  };
+
+  /* Resumen de mercado de un área (una banda de isócrona, p. ej.): población,
+   * viviendas y su reparto por segmento NSE, en absolutos y en %. Mismo método
+   * que el radio (interpolación areal sobre `rows`), así que las cifras de una
+   * isócrona y de un radio sobre la misma zona son comparables.
+   *   rows:            [{ frac, props }] como en aggregateDemographics
+   *   areaKm2:         área total del polígono analizado
+   *   agebAreaKm2:     parte de esa área cubierta por AGEB urbana 2020 */
+  function resumenMercado(rows, areaKm2, agebAreaKm2) {
+    const d = aggregateDemographics(rows);
+    const pob = {}, viv = {}, pct = {};
+    for (const [seg, niveles] of Object.entries(NSE_SEGMENTOS)) {
+      pob[seg] = 0;
+      viv[seg] = 0;
+      for (const r of rows) {
+        if (!niveles.includes(r.props.nse_nivel)) continue;
+        pob[seg] += (r.props.POBTOT || 0) * r.frac;
+        viv[seg] += (r.props.TVIVPARHAB || 0) * r.frac;
+      }
+      pct[seg] = d.pop > 0 ? (pob[seg] / d.pop) * 100 : null;
+    }
+    return {
+      areaKm2,
+      nAgebs: rows.length,
+      pop: d.pop,
+      viviendas: d.viviendas,
+      nivelPred: d.nivelPred,
+      nsePct: d.nsePct,
+      pctAuto: d.pctAuto,
+      escolaridad: d.escolaridad,
+      segmentos: { pob, viv, pct },
+      pctSinAgeb: coverageSinAgeb(agebAreaKm2, areaKm2),
+    };
+  }
+
   /* min / mediana / max / n de una lista de valores catastrales ($/m²). */
   function catastralStats(valores) {
     const v = valores.filter((x) => x != null).sort((a, b) => a - b);
@@ -656,6 +700,7 @@
 
   return {
     aggregateDemographics, coverageSinAgeb, catastralStats, weightedMean,
+    NSE_SEGMENTOS, resumenMercado,
     CORTES_EDAD_NOTA, NOTA_METODO_BUFFER, NSE_NIVELES_ORDEN,
     buildZonaAgregados, buildZonaEstudioJSON, ZONA_ESTUDIO_SCHEMA_VERSION,
     csvEscape, bufferCSVRows,

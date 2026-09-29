@@ -402,3 +402,45 @@ test("paridad CSV↔JSON: mismos números, mismos redondeos (caso Lisboa Residen
     parEq(`proyecto: ${p.nombre} (${p.tipo})`, p.distancia_km, `distancia de ${p.nombre}`);
   }
 });
+
+// ------------------------------------------- mercado alcanzable (isócronas)
+test("mercado: segmentos NSE en absolutos y %, con fracción de área", () => {
+  const rows = [
+    { frac: 1.0, props: { POBTOT: 1000, TVIVPARHAB: 300, nse_nivel: "A/B" } },
+    { frac: 0.5, props: { POBTOT: 2000, TVIVPARHAB: 600, nse_nivel: "C-" } },
+    { frac: 1.0, props: { POBTOT: 1000, TVIVPARHAB: 250, nse_nivel: "E" } },
+    // sin nivel: cuenta en el total pero en ningún segmento
+    { frac: 1.0, props: { POBTOT: 1000, TVIVPARHAB: 200, nse_nivel: null } },
+  ];
+  const m = BufferCore.resumenMercado(rows, 10, 8);
+  assert.equal(m.pop, 4000);
+  assert.equal(m.viviendas, 1050);
+  assert.deepEqual(m.segmentos.viv, { alto: 300, medio: 300, bajo: 250 });
+  assert.deepEqual(m.segmentos.pob, { alto: 1000, medio: 1000, bajo: 1000 });
+  assert.equal(m.segmentos.pct.alto, 25);
+  // los segmentos no suman 100 cuando hay AGEBs sin nivel: no se reparte lo que no se sabe
+  const suma = m.segmentos.pct.alto + m.segmentos.pct.medio + m.segmentos.pct.bajo;
+  assert.equal(suma, 75);
+  assert.ok(Math.abs(m.pctSinAgeb - 20) < 1e-9);
+  assert.equal(m.nAgebs, 4);
+});
+
+test("mercado: sin AGEBs da ceros y % nulos, no NaN", () => {
+  const m = BufferCore.resumenMercado([], 5, 0);
+  assert.equal(m.pop, 0);
+  assert.equal(m.segmentos.pct.alto, null);
+  assert.equal(m.pctSinAgeb, 100);
+});
+
+test("mercado: sobre el radio real de Lisboa coincide con aggregateDemographics", () => {
+  const { agebRows, bufferAreaKm2, agebAreaKm2 } = buildLisboaAgebRows();
+  const m = BufferCore.resumenMercado(agebRows, bufferAreaKm2, agebAreaKm2);
+  const d = BufferCore.aggregateDemographics(agebRows);
+  assert.equal(m.pop, d.pop);
+  assert.equal(m.viviendas, d.viviendas);
+  // los tres segmentos cubren los 7 niveles: suman la población con nivel conocido
+  const conNivel = Object.entries(d.nsePop)
+    .filter(([n]) => n !== "S/D").reduce((s, [, p]) => s + p, 0);
+  const sumSeg = m.segmentos.pob.alto + m.segmentos.pob.medio + m.segmentos.pob.bajo;
+  assert.ok(Math.abs(sumSeg - conNivel) < 1e-6);
+});

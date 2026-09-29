@@ -21,11 +21,14 @@
  * El resto (banding, dibujo, conteo de conectividad) es igual sin importar el
  * motor: ambos devuelven polígonos anidados P5 ⊂ P10 ⊂ P15.
  *
- * Con las bandas ya calculadas se cuenta qué cae dentro de cada tiempo (POIs
- * por categoría y proyectos de vivienda nueva) como prueba de conectividad.
+ * Con las bandas ya calculadas se cuenta qué cae dentro de cada tiempo: el
+ * mercado alcanzable (población, viviendas y segmentos NSE del Censo 2020, con
+ * la misma interpolación areal que el radio), POIs por categoría y proyectos
+ * de vivienda nueva.
  *
- * Requiere: turf (CDN), main.js (map, DATA, drawnItems*), config.js
- * (TOMTOM_API_KEY y ORS_PROXY_URL), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
+ * Requiere: turf (CDN), main.js (map, DATA, drawnItems*, NSE_COLORS), config.js
+ * (TOMTOM_API_KEY y ORS_PROXY_URL), buffer-core.js (resumenMercado), buffer.js
+ * (agebsEnPoligono), poi.js (POI_ESTILO, DATA.poi) y proyectos.js
  * (PROYECTOS_SOFTEC). Es excluyente con el análisis de Radio (buffer.js) y de
  * polígono (zona.js): iniciar cualquiera limpia los otros.
  * (*drawnItems/currentZone/currentStats son globales de zona.js — scripts
@@ -234,7 +237,8 @@ async function analyzeIso(lat, lng, mode, minutes) {
   });
 
   const reach = analyzeReach(polys, minutes);
-  const state = { lat, lng, mode, minutes, bands, reach };
+  const mercado = analyzeMercado(polys);
+  const state = { lat, lng, mode, minutes, bands, reach, mercado };
   isoCache.set(key, state);
   if (isoCache.size > 20) isoCache.delete(isoCache.keys().next().value);
   return state;
@@ -243,6 +247,25 @@ async function analyzeIso(lat, lng, mode, minutes) {
 function isoPointInPoly(lng, lat, poly) {
   try { return turf.booleanPointInPolygon(turf.point([lng, lat]), poly); }
   catch (e) { return false; }
+}
+
+// Mercado alcanzable: población, viviendas y segmentos NSE dentro de cada
+// banda (acumulado: la de 10 min incluye la de 5). Mismo cálculo que el radio
+// (agebsEnPoligono + interpolación areal, buffer.js/buffer-core.js), así que
+// "a 10 min en auto" y "en 3 km" se pueden comparar directamente.
+// null si las AGEBs aún no cargan: el panel lo dice en vez de mostrar ceros.
+function analyzeMercado(polys) {
+  if (!DATA.agebs) return null;
+  // De afuera hacia adentro: las AGEBs de una banda interior son un
+  // subconjunto de las de la exterior, así se intersecta mucho menos.
+  const out = new Array(polys.length);
+  let candidatas = DATA.agebs.features;
+  for (let i = polys.length - 1; i >= 0; i--) {
+    const { rows, areaKm2 } = agebsEnPoligono(polys[i], candidatas);
+    out[i] = BufferCore.resumenMercado(rows, turf.area(polys[i]) / 1e6, areaKm2);
+    candidatas = rows.map((r) => r.feature);
+  }
+  return out;
 }
 
 // Conectividad: qué se alcanza dentro de cada banda (conteos acumulados).
@@ -447,6 +470,46 @@ function isoFormHTML(s) {
     </div>`;
 }
 
+// Tabla "Mercado alcanzable": una columna por banda (acumulado). Los
+// segmentos se muestran en viviendas porque es la unidad que usa quien planea
+// una tienda o un desarrollo (hogares), con el % de población al lado.
+function isoMercadoHTML(s) {
+  const m = s.mercado;
+  if (!m) {
+    return `<div class="zone-list">Los datos censales aún se están cargando: vuelve a calcular en unos segundos para ver la población alcanzable.</div>`;
+  }
+  const mins = s.minutes;
+  const fila = (label, fn, cls = "") =>
+    `<tr class="${cls}"><td>${label}</td>${m.map((b) => `<td>${fn(b)}</td>`).join("")}</tr>`;
+  const pct = (n) => (n == null ? "s/d" : `${Math.round(n)}%`);
+  // el % va en su propio renglón: el panel es angosto y tres columnas de
+  // "53,788 35%" no caben sin scroll horizontal
+  const seg = (k) => (b) =>
+    `${isoFmt(b.segmentos.viv[k])}<br><span class="bf-pdu-prog">${pct(b.segmentos.pct[k])}</span>`;
+
+  const ext = m[m.length - 1];
+  const warn = ext.pctSinAgeb != null && ext.pctSinAgeb > 25
+    ? `<div class="buffer-warn">⚠ El ${Math.round(ext.pctSinAgeb)}% del área de ${mins[mins.length - 1]} min
+        no tiene AGEB urbana 2020 (fraccionamientos nuevos o zona rural): la población
+        alcanzable está <strong>subestimada</strong>.</div>`
+    : "";
+
+  return `
+    ${warn}
+    <div class="zone-list"><strong>Mercado alcanzable (Censo 2020, acumulado):</strong></div>
+    <div class="buffer-table-wrap iso-mercado-wrap"><table class="buffer-table iso-table iso-mercado">
+      <tr><th></th>${mins.map((x, i) => `<th>≤${x}${i === mins.length - 1 ? " min" : ""}</th>`).join("")}</tr>
+      ${fila("Población", (b) => `<strong>${isoFmt(b.pop)}</strong>`)}
+      ${fila("Viviendas", (b) => isoFmt(b.viviendas))}
+      ${fila(`<span class="legend-dot" style="background:${NSE_COLORS["C+"]}"></span>Alto<div class="iso-sub">A/B, C+</div>`, seg("alto"))}
+      ${fila(`<span class="legend-dot" style="background:${NSE_COLORS["C-"]}"></span>Medio<div class="iso-sub">C, C-</div>`, seg("medio"))}
+      ${fila(`<span class="legend-dot" style="background:${NSE_COLORS["D"]}"></span>Bajo<div class="iso-sub">D+, D, E</div>`, seg("bajo"))}
+      ${fila("NSE pred.", (b) => b.nivelPred || "—")}
+      ${fila("Con auto", (b) => pct(b.pctAuto))}
+    </table></div>
+    <div class="iso-sub">Segmentos en viviendas y % de la población. NSE estimado propio, no AMAI.</div>`;
+}
+
 function isoResultsHTML(s) {
   const modeLabel = ISO_MODES[s.mode].label.toLowerCase();
 
@@ -456,6 +519,8 @@ function isoResultsHTML(s) {
       <div class="zc-value">${isoFmt(b.areaKm2, 1)} km²</div>
       <div class="zc-sub">área alcanzable</div>
     </div>`).join("");
+
+  const mercadoBlock = isoMercadoHTML(s);
 
   const r = s.reach;
   let poiBlock;
@@ -487,14 +552,16 @@ function isoResultsHTML(s) {
 
   return `
     <div class="zone-cards iso-cards">${cards}</div>
+    ${mercadoBlock}
     ${poiBlock}
     ${proyBlock}
     <div class="zone-note">${s.mode === "car"
       ? "Isócronas en auto: TomTom sobre la red vial real, con tráfico típico y <strong>calibrado contra Google Maps</strong> para Aguascalientes (×1.25)."
       : "Isócronas a pie: OpenRouteService sobre la red vial de OpenStreetMap (velocidad de caminata)."}
       Cada banda es el área alcanzable en ≤ N minutos desde el punto, puerta a puerta — útil para
-      comparar conectividad entre zonas, no como hora de llegada exacta. POIs de OpenStreetMap
-      (ODbL); proyectos del estudio de mercado 1T26.</div>`;
+      comparar conectividad entre zonas, no como hora de llegada exacta. Población y viviendas:
+      Censo 2020 (INEGI) por interpolación areal, igual que el radio; segmentos con el NSE proxy
+      propio (no AMAI). POIs de OpenStreetMap (ODbL); proyectos del estudio de mercado 1T26.</div>`;
 }
 
 function renderIsoPanel(s, { loading = false, error = null } = {}) {
