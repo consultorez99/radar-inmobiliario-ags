@@ -44,7 +44,11 @@ Herramientas interactivas:
 - **Zona de estudio**: dibuja un polígono (botón bajo el zoom) y obtén
   población, NSE predominante, estadísticas de valor catastral, rangos de
   mercado, % de uso de suelo del PDU y gráficos (composición NSE + histograma
-  catastral). Cálculo 100% en el navegador con Turf.js.
+  catastral). Cálculo 100% en el navegador con Turf.js. La población y demás
+  variables censales usan la **misma interpolación areal que el radio** (cada
+  AGEB aporta la fracción de su área dentro del polígono); hasta sep-2026 se
+  sumaban AGEBs completas, lo que inflaba polígonos que rozaban AGEBs grandes
+  — el JSON de polígono subió a `schema_version: 2` por ese cambio.
 - **Reporte PDF** de la zona dibujada (2 páginas: indicadores + captura del
   mapa, gráficos y tabla de colonias con fuentes y disclaimer).
 - **Comparador**: botón "⚖️ Comparar" en los popups de la capa Catastral para

@@ -94,22 +94,16 @@ function featuresInZone(collection, polygon, mode) {
 function analyzeZone(polygon) {
   const areaKm2 = turf.area(polygon) / 1e6;
 
-  // AGEBs (por intersección; el NSE/población se toma completo por AGEB)
-  const agebs = featuresInZone(DATA.agebs, polygon, "intersects").map((f) => f.properties);
-  const pop = agebs.reduce((s, p) => s + (p.POBTOT || 0), 0);
+  // AGEBs por interpolación areal, igual que el radio y las isócronas: cada
+  // AGEB aporta la fracción de su área que cae dentro del polígono. Antes se
+  // sumaban AGEBs completas, y un polígono que apenas rozaba una esquina se
+  // llevaba toda su población.
+  const { rows: agebRows, areaKm2: agebAreaKm2 } = agebsEnPoligono(polygon);
+  const agebs = agebRows.map((r) => r.props);
+  const demo = BufferCore.aggregateDemographics(agebRows);
+  // AGEBs que tocan la zona, por nivel (conteo de unidades, no de población)
   const nseCounts = {};
-  let scoreSum = 0, scoreW = 0, d2 = 0, c3 = 0, nPct = 0;
-  for (const p of agebs) {
-    nseCounts[p.nse_nivel || "S/D"] = (nseCounts[p.nse_nivel || "S/D"] || 0) + 1;
-    if (p.nse_score != null && p.POBTOT) { scoreSum += p.nse_score * p.POBTOT; scoreW += p.POBTOT; }
-    if (p.pct_2dorm != null) { d2 += p.pct_2dorm; c3 += p.pct_3cuart || 0; nPct++; }
-  }
-  // nivel predominante por población
-  const popByNivel = {};
-  for (const p of agebs) {
-    popByNivel[p.nse_nivel] = (popByNivel[p.nse_nivel] || 0) + (p.POBTOT || 0);
-  }
-  const nivelPred = Object.entries(popByNivel).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  for (const p of agebs) nseCounts[p.nse_nivel || "S/D"] = (nseCounts[p.nse_nivel || "S/D"] || 0) + 1;
 
   // Colonias con valor catastral (por punto representativo dentro de la zona)
   const cols = featuresInZone(DATA.cat, polygon, "point").map((f) => f.properties);
@@ -145,13 +139,16 @@ function analyzeZone(polygon) {
   // Mercado potencial en pesos: por interpolación areal (fracción de cada
   // AGEB dentro del polígono), igual que radio e isócronas — sumar el AGEB
   // completo inflaría el dinero de un polígono que solo roza una esquina.
-  const gasto = window.GastoUI?.disponible()
-    ? window.GastoUI.calcular(agebsEnPoligono(polygon).rows) : null;
+  const gasto = window.GastoUI?.calcular(agebRows) || null;
 
   return {
-    areaKm2, nAgebs: agebs.length, pop, nivelPred,
-    nseScore: scoreW ? scoreSum / scoreW : null,
-    nseCounts, pct2dorm: nPct ? d2 / nPct : null, pct3cuart: nPct ? c3 / nPct : null,
+    areaKm2, nAgebs: agebs.length, agebRows, demo,
+    pop: demo.pop, viviendas: demo.viviendas,
+    nivelPred: demo.nivelPred || "—",
+    nseScore: BufferCore.weightedMean(agebRows, "nse_score", "POBTOT"),
+    nseCounts, nsePct: demo.nsePct,
+    pct2dorm: demo.pct2dorm, pct3cuart: demo.pct3cuart,
+    pctSinAgeb: BufferCore.coverageSinAgeb(agebAreaKm2, areaKm2),
     cols: cols.sort((a, b) => b.valor_m2 - a.valor_m2), catStats,
     priceZones, pduShares, poblacionMunicipios, gasto,
   };
@@ -178,13 +175,19 @@ function renderZonePanel(s) {
         .join(" · ")
     : "s/d";
 
+  const warn = s.pctSinAgeb != null && s.pctSinAgeb > 25 ? `
+    <div class="buffer-warn">⚠ El ${fmt(s.pctSinAgeb)}% del área del polígono no tiene AGEB urbana
+      2020 (fraccionamientos nuevos o zona rural): los agregados <strong>subestiman</strong> la
+      población actual de la zona.</div>` : "";
+
   el.innerHTML = `
+    ${warn}
     <div class="zone-cards">
       <div class="zone-card"><div class="zc-label">Superficie</div>
         <div class="zc-value">${fmt(s.areaKm2, 1)} km²</div></div>
       <div class="zone-card"><div class="zc-label">Población (Censo 2020)</div>
         <div class="zc-value">${fmt(s.pop)}</div>
-        <div class="zc-sub">${s.nAgebs} AGEBs</div></div>
+        <div class="zc-sub">${fmt(s.viviendas)} viviendas · ${s.nAgebs} AGEBs (interp. areal)</div></div>
       <div class="zone-card"><div class="zc-label">NSE predominante</div>
         <div class="zc-value" style="color:${NSE_COLORS[s.nivelPred] || "#333"}">${s.nivelPred}</div>
         <div class="zc-sub">índice ${s.nseScore != null ? s.nseScore.toFixed(2) : "s/d"}</div></div>
@@ -224,12 +227,13 @@ function renderZoneCharts(s) {
     if (zoneCharts[k]) { zoneCharts[k].destroy(); zoneCharts[k] = null; }
   }
 
-  // composición NSE (dona)
-  const niveles = Object.keys(NSE_LABELS).filter((n) => s.nseCounts[n]);
+  // composición NSE (dona): % de POBLACIÓN, como en el radio — contar AGEBs
+  // pesaba igual una de 50 habitantes que una de 5,000
+  const niveles = Object.keys(NSE_LABELS).filter((n) => s.nsePct[n] != null && s.nsePct[n] > 0);
   if (niveles.length) {
-    const totalAgebs = niveles.reduce((t, n) => t + s.nseCounts[n], 0);
-    const dominante = niveles.reduce((a, b) => (s.nseCounts[b] > s.nseCounts[a] ? b : a));
-    const pctDom = Math.round((s.nseCounts[dominante] / totalAgebs) * 100);
+    const dominante = niveles.reduce((a, b) => (s.nsePct[b] > s.nsePct[a] ? b : a));
+    const pctDom = Math.round(s.nsePct[dominante]);
+    const pobTot = Math.round(s.pop || 0);
     zoneCharts.nse = RadarCharts.crear("chart-nse", {
       type: "doughnut",
       data: {
@@ -238,7 +242,7 @@ function renderZoneCharts(s) {
         // leyenda con "C+ — Medio-alto" x7 deja la dona del tamaño de una moneda
         labels: niveles,
         datasets: [{
-          data: niveles.map((n) => s.nseCounts[n]),
+          data: niveles.map((n) => Number(s.nsePct[n].toFixed(1))),
           backgroundColor: niveles.map((n) => NSE_COLORS[n]),
           borderColor: "#ffffff",
           borderWidth: 2,
@@ -248,14 +252,17 @@ function renderZoneCharts(s) {
       options: {
         cutout: "58%",
         plugins: {
-          title: { text: `Predomina el nivel ${dominante}: ${pctDom}% de los AGEBs` },
-          subtitle: { text: `${totalAgebs} AGEBs urbanos dentro del polígono` },
+          title: { text: `Predomina el nivel ${dominante}: ${pctDom}% de la población` },
+          subtitle: { text: `${pobTot.toLocaleString("es-MX")} habitantes estimados · interpolación areal sobre AGEBs` },
           legend: { position: "right" },
-          donaCentro: { valor: totalAgebs, etiqueta: "AGEBs" },
+          donaCentro: {
+            valor: pobTot >= 1000 ? (pobTot / 1000).toFixed(1).replace(".", ",") + "k" : String(pobTot),
+            etiqueta: "hab.",
+          },
           tooltip: {
             callbacks: {
               title: (i) => NSE_LABELS[i[0].label] || i[0].label,
-              label: (c) => ` ${c.parsed} AGEBs · ${Math.round((c.parsed / totalAgebs) * 100)}%`,
+              label: (c) => ` ${c.parsed}% de la población`,
             },
           },
           fuente: { text: "Fuente: INEGI, Censo 2020 · estimación de NSE propia" },
@@ -381,7 +388,7 @@ function exportZonaCSV() {
   const F_CAT   = "Leyes de Ingresos 2026 (Aguascalientes y Jesús María)";
   const F_PDU   = "PDUCA 2040 ev.2 / PDU Cd. Jesús María 2015-2035 / PMDU Jesús María 2017-2040";
   const F_CONAPO = "CONAPO — Proyecciones de Población de los Municipios de México 1990-2040";
-  const M_POLIGONO = "suma directa de las AGEBs que intersectan el polígono dibujado (sin ponderación por fracción de área)";
+  const M_POLIGONO = "interpolación areal: variable ponderada por fracción de área del AGEB dentro del polígono (asume distribución uniforme)";
 
   const rows = [["metrica", "valor", "unidad", "fuente", "metodo"]];
   const add = (m, v, u, f, met) => rows.push([m, v ?? "s/d", u, f, met]);
@@ -390,9 +397,12 @@ function exportZonaCSV() {
   add("area_poligono", fmt2(s.areaKm2), "km²", "cálculo propio", "área geométrica del polígono");
   add("agebs_intersectadas", s.nAgebs, "AGEBs", F_CENSO, "AGEBs con intersección no vacía con el polígono");
 
+  add("pct_area_sin_ageb", fmt1(s.pctSinAgeb), "% del área del polígono", F_CENSO,
+    "área del polígono no cubierta por AGEB urbana 2020; si es alto, los agregados subestiman la zona");
   add("poblacion_estimada", fmt0(s.pop), "habitantes", F_CENSO, M_POLIGONO);
+  add("viviendas_habitadas_estimadas", fmt0(s.viviendas), "viviendas particulares habitadas", F_CENSO, M_POLIGONO);
   add("nse_predominante", s.nivelPred || "s/d", "", "NSE proxy propio con Censo 2020 (no AMAI)", M_POLIGONO);
-  add("nse_score", fmt2(s.nseScore), "índice NSE", "NSE proxy propio con Censo 2020 (no AMAI)", "promedio ponderado por población");
+  add("nse_score", fmt2(s.nseScore), "índice NSE", "NSE proxy propio con Censo 2020 (no AMAI)", "promedio ponderado por población × fracción de área");
   add("pct_viviendas_2mas_recamaras", fmt1(s.pct2dorm), "% de viviendas habitadas", F_CENSO, M_POLIGONO);
   add("pct_viviendas_3mas_cuartos", fmt1(s.pct3cuart), "% de viviendas habitadas", F_CENSO, M_POLIGONO);
 
@@ -400,7 +410,13 @@ function exportZonaCSV() {
   const NSE_ORDEN = BufferCore.NSE_NIVELES_ORDEN;
   for (const nivel of NSE_ORDEN) {
     const cnt = s.nseCounts?.[nivel];
-    if (cnt != null) add(`nse_${nivel}_agebs`, cnt, "AGEBs", "NSE proxy propio con Censo 2020 (no AMAI)", M_POLIGONO);
+    if (cnt != null) add(`nse_${nivel}_agebs`, cnt, "AGEBs", "NSE proxy propio con Censo 2020 (no AMAI)",
+      "AGEBs de ese nivel que intersectan el polígono (conteo de unidades, sin ponderar)");
+  }
+  for (const nivel of NSE_ORDEN) {
+    const pct = s.nsePct?.[nivel];
+    if (pct != null) add(`nse_${nivel}_pct_poblacion`, fmt1(pct), "% de población",
+      "NSE proxy propio con Censo 2020 (no AMAI)", M_POLIGONO);
   }
 
   // Catastral
@@ -447,8 +463,8 @@ function exportZonaCSV() {
 
   rows.push(["nota_metodologica",
     "Estadísticas calculadas con datos abiertos (INEGI Censo 2020, Leyes de Ingresos 2026, IMPLAN). " +
-    "La población y viviendas se suman por AGEB completa (sin interpolación areal), por lo que la " +
-    "estimación incluye la población de las AGEBs parcialmente dentro del polígono.", "", "", ""]);
+    "Las variables censales se ponderan por la fracción del área de cada AGEB dentro del polígono " +
+    "(interpolación areal, mismo método que el radio), asumiendo distribución uniforme dentro del AGEB.", "", "", ""]);
 
   const csv = rows.map((r) => r.map(csvEscapeZona).join(",")).join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
@@ -489,19 +505,26 @@ function exportZonaJSON() {
   nseDistribucion.nivel_predominante = s.nivelPred || null;
 
   const json = {
-    schema_version: 1,
+    // v2: la población y demás agregados pasan de "AGEB completa" a
+    // interpolación areal — mismas claves, distinto significado: sube la
+    // versión para que nadie compare cifras v1 con v2 sin darse cuenta.
+    // Aditivos: viviendas, cobertura_ageb_pct y nse_pct_poblacion.
+    schema_version: 2,
     tipo_analisis: "poligono_dibujado",
     generado: new Date().toISOString(),
     area_poligono_km2: round2(s.areaKm2),
     agebs_intersectadas: s.nAgebs,
+    cobertura_ageb_pct: s.pctSinAgeb != null ? round1(100 - s.pctSinAgeb) : null,
     geojson_poligono: currentZone,
     demografia: {
       poblacion_total: round0(s.pop),
+      viviendas_particulares_habitadas: round0(s.viviendas),
       nse_score: round2(s.nseScore),
       pct_viviendas_2mas_recamaras: round1(s.pct2dorm),
       pct_viviendas_3mas_cuartos: round1(s.pct3cuart),
     },
     nse_distribucion: nseDistribucion,
+    nse_pct_poblacion: Object.fromEntries(Object.entries(s.nsePct || {}).map(([n, p]) => [n, round1(p)])),
     catastral: s.catStats ? {
       colonias_n: s.catStats.n,
       min_m2: s.catStats.min,
@@ -534,8 +557,9 @@ function exportZonaJSON() {
       "Estudio de mercado de terceros, corte 1T26 — zonas de precio",
     ],
     advertencias: [
-      "La población se suma por AGEB completa (sin interpolación areal); las AGEBs parcialmente dentro " +
-      "del polígono se cuentan completas, por lo que la estimación puede sobreestimar la población real.",
+      "Interpolación areal: cada AGEB aporta sus variables ponderadas por la fracción de su área dentro " +
+      "del polígono, asumiendo distribución uniforme de población y viviendas dentro del AGEB. " +
+      "nse_distribucion cuenta AGEBs que tocan el polígono; nse_pct_poblacion es el reparto por población.",
       "Estadísticas calculadas con datos abiertos. No es un avalúo ni conteo exacto.",
     ],
   };
@@ -581,32 +605,33 @@ function descargarZip(bytes, nombre) {
 }
 window.descargarZip = descargarZip;
 
-/* Agregados del polígono dibujado en la forma que espera capaZona. Ojo: este
- * modo NO interpola por área — cuenta cada AGEB completa (ver analyzeZone), y
- * por eso METODO lo dice y la cobertura de AGEB va vacía: son campos que este
- * análisis no calcula, y el .dbf no debe rellenarlos con un cero. */
+/* Agregados del polígono dibujado en la forma que espera capaZona. Mismo
+ * método que el radio (interpolación areal, ver analyzeZone), así que llena
+ * los mismos campos. */
 function zonaDesdePoligono(s, generado) {
+  const d = s?.demo || {};
   return {
     tipo: "poligono_dibujado",
     radioKm: null, lat: null, lon: null,
-    areaKm2: s?.areaKm2, nAgebs: s?.nAgebs, coberturaAgebPct: null,
+    areaKm2: s?.areaKm2, nAgebs: s?.nAgebs,
+    coberturaAgebPct: s?.pctSinAgeb != null ? 100 - s.pctSinAgeb : null,
     pobTotal: s?.pop,
-    pobFem: null, pobMas: null,
-    pob0a14: null, pob15a24: null, pob25a59: null, pob60mas: null,
-    vivHab: null, escolaridad: null, ocupCuarto: null,
+    pobFem: d.popFem, pobMas: d.popMas,
+    pob0a14: d.pob0a14, pob15a24: d.pob15a24, pob25a59: d.pob25a59, pob60mas: d.pob60mas,
+    vivHab: d.viviendas, escolaridad: d.escolaridad, ocupCuarto: d.ocupCuarto,
     nsePred: s?.nivelPred, nseScore: s?.nseScore,
-    pctInternet: null, pctAuto: null,
-    pct2dorm: s?.pct2dorm, pct3cuart: s?.pct3cuart, pctDeshabitadas: null,
+    pctInternet: d.pctInter, pctAuto: d.pctAuto,
+    pct2dorm: s?.pct2dorm, pct3cuart: s?.pct3cuart, pctDeshabitadas: d.pctDeshabitadas,
     catN: s?.catStats?.n, catMin: s?.catStats?.min,
     catMed: s?.catStats?.med, catMax: s?.catStats?.max,
-    metodo: "ageb_completa_sin_interpolacion",
+    metodo: "interpolacion_areal_por_fraccion_de_ageb",
     generado,
   };
 }
 
 /* Nota que viaja dentro del ZIP: quien reciba el shapefile suelto, sin la app,
  * necesita saber de dónde salió cada capa y con qué método. */
-function leemeSIG(descripcionZona, conFraccion) {
+function leemeSIG(descripcionZona) {
   return [
     "Radar Inmobiliario · Aguascalientes — exportación a SIG",
     "Generado: " + new Date().toISOString(),
@@ -626,11 +651,8 @@ function leemeSIG(descripcionZona, conFraccion) {
     "completo de cada AGEB, colonia o uso de suelo que toca la zona. Un AGEB",
     "partido a la mitad deja de ser la unidad censal a la que corresponden sus",
     "cifras, así que POBTOT y demás campos son los del AGEB ENTERO.",
-    conFraccion
-      ? "El campo FRAC_ZONA trae la fracción (0-1) del área del AGEB dentro de la" +
-        "\nzona: multiplica por él para reproducir la interpolación areal del panel."
-      : "FRAC_ZONA va vacío: en modo polígono el panel cuenta cada AGEB completa," +
-        "\nno interpola por área, y el shapefile no inventa un dato que no se calculó.",
+    "El campo FRAC_ZONA trae la fracción (0-1) del área del AGEB dentro de la",
+    "zona: multiplica por él para reproducir la interpolación areal del panel.",
     "",
     "El NSE es un proxy propio con Censo 2020 (INEGI), no la metodología AMAI.",
     "Estimaciones con datos abiertos. No es un avalúo ni un conteo exacto.",
@@ -640,9 +662,9 @@ window.leemeSIG = leemeSIG;
 
 function exportZonaSHP() {
   const fecha = new Date().toISOString().slice(0, 10);
-  // El panel de polígono cuenta cada AGEB completa (no interpola por área), así
-  // que la fracción va nula: el .dbf no debe sugerir un cálculo que no se hizo.
-  const agebs = featuresInZone(DATA.agebs, currentZone, "intersects").map((f) => ({ feature: f, frac: null }));
+  // agebRows trae la fracción de área que usó la interpolación del panel: se
+  // exporta tal cual para que el .dbf reproduzca esas mismas cifras.
+  const agebs = (currentStats?.agebRows || []).map((r) => ({ feature: r.feature, frac: r.frac }));
   const capas = [
     BufferCore.capaZona(currentZone.geometry, zonaDesdePoligono(currentStats, fecha)),
     ...BufferCore.capasSIG({
@@ -653,7 +675,7 @@ function exportZonaSHP() {
   ];
   const bytes = ShapefileZip.desdeCapas(capas, [{
     nombre: "LEEME.txt",
-    datos: new TextEncoder().encode(leemeSIG(`polígono dibujado, ${(currentStats?.areaKm2 ?? 0).toFixed(2)} km²`, false)),
+    datos: new TextEncoder().encode(leemeSIG(`polígono dibujado, ${(currentStats?.areaKm2 ?? 0).toFixed(2)} km²`)),
   }]);
   descargarZip(bytes, `zona-poligono_${fecha}_shp.zip`);
 }

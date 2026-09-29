@@ -650,7 +650,7 @@ function exportBufferSHP() {
   const bytes = ShapefileZip.desdeCapas(capas, [{
     nombre: "LEEME.txt",
     datos: new TextEncoder().encode(
-      window.leemeSIG(`radio de ${radiusKm} km desde ${lat.toFixed(5)}, ${lng.toFixed(5)} (${areaKm2.toFixed(2)} km²)`, true)),
+      window.leemeSIG(`radio de ${radiusKm} km desde ${lat.toFixed(5)}, ${lng.toFixed(5)} (${areaKm2.toFixed(2)} km²)`)),
   }]);
   window.descargarZip(bytes, `zona-influencia_${lat.toFixed(5)}_${lng.toFixed(5)}_${radiusKm}km_shp.zip`);
 }
