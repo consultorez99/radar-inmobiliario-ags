@@ -18,3 +18,24 @@ services:
       - path: /*
         name: Cache-Control
         value: public, max-age=3600
+
+  # Proxy de OpenRouteService para el modo "A pie" de las isócronas (proxy/).
+  # Existe porque la clave de ORS no se puede restringir por dominio y por lo
+  # tanto no puede vivir en web/config.js, que es público. Ver README.
+  - type: web
+    name: radar-inmobiliario-ags-proxy
+    runtime: node
+    plan: free
+    rootDir: proxy
+    buildCommand: npm install
+    startCommand: npm start
+    # Render reinicia el servicio si /salud deja de responder. La app también
+    # pega aquí para despertarlo (el plan free duerme tras ~15 min sin uso).
+    healthCheckPath: /salud
+    envVars:
+      # sync: false = Render la pide en el dashboard y NO se guarda en el repo.
+      # Es todo el punto de este servicio: la clave nunca se versiona.
+      - key: ORS_API_KEY
+        sync: false
+      - key: ORIGENES_PERMITIDOS
+        value: https://radar-inmobiliario-ags.onrender.com

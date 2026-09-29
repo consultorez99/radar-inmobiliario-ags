@@ -1,37 +1,43 @@
 /* Configuración de servicios externos.
  *
- * TOMTOM_API_KEY: clave del Developer Portal de TomTom
+ * Regla de la casa: en un sitio 100% estático, TODO lo que esté en este
+ * archivo viaja al navegador y es visible para cualquiera que abra el
+ * inspector. Aquí solo van claves que el proveedor permita restringir por
+ * dominio. Lo que no se pueda restringir, va en el servidor (ver proxy/).
+ */
+
+"use strict";
+
+/* TOMTOM_API_KEY: clave del Developer Portal de TomTom
  * (https://developer.tomtom.com — plan gratuito: 50,000 tiles/día).
  * Alimenta la capa "Tráfico" (flujo vehicular en tiempo real) y el modo Auto
  * de la capa "Isócronas" (Routing API "Calculate Reachable Range" — usa tráfico
  * típico, por eso da áreas más realistas que ORS en velocidad libre).
  *
- * NOTA: al ser una app 100% estática, esta clave es visible para cualquiera
- * que inspeccione el sitio. En el portal de TomTom, restringe la clave por
- * dominio (allowed origins) a radar-inmobiliario-ags.onrender.com y
- * localhost para que no pueda usarse desde otros sitios, y vigila el
- * consumo en su dashboard. Si se deja vacía, el botón Tráfico muestra
- * las instrucciones de configuración en lugar de la capa.
+ * Es una clave de navegador y está pensada para ser pública, PERO eso solo es
+ * seguro si está restringida por dominio. En el portal de TomTom
+ * (Dashboard → la clave → Allowed Origins) deben estar SOLO:
+ *   https://radar-inmobiliario-ags.onrender.com
+ *   http://localhost:8000
+ * Sin esa restricción, cualquiera puede copiarla del inspector y gastar la
+ * cuota. Si se deja vacía, el botón Tráfico muestra las instrucciones de
+ * configuración en lugar de la capa.
  */
-
-"use strict";
-
 const TOMTOM_API_KEY = "nCONdLiT2PF3t0aaB9TdbevIqBis8QAZ";
 
-/* ORS_API_KEY: clave del panel de OpenRouteService
- * (https://openrouteservice.org/dev/#/signup — plan gratuito: 500 isócronas/día,
- * 20/min). Alimenta el modo "A pie" de la capa "Isócronas" (una sola llamada
- * trae las tres bandas, sobre la red vial de OpenStreetMap).
+/* ORS_PROXY_URL: base del proxy propio que habla con OpenRouteService
+ * (código en proxy/, desplegado como servicio web en Render — ver render.yaml).
  *
- * El modo Auto NO usa ORS sino TomTom: ORS calcula en velocidad libre (sin
- * tráfico) y sus áreas de auto salían poco realistas; TomTom usa tráfico típico.
- * Pero TomTom no puede caminar (su "Reachable Range" es solo motorizado, rechaza
- * el modo a pie), así que el "A pie" sí depende de ORS.
+ * POR QUÉ HAY UN PROXY Y NO UNA CLAVE AQUÍ: ORS no permite restringir la clave
+ * por dominio, a diferencia de TomTom. Puesta en este archivo quedaba a la
+ * vista en un repo público y cualquiera podía agotar las 500 isócronas/día,
+ * dejando el modo "A pie" muerto. Ahora la clave vive en la variable de
+ * entorno ORS_API_KEY del servicio en Render y nunca llega al navegador.
  *
- * NOTA: al ser una app 100% estática, esta clave viaja al navegador y es visible
- * para cualquiera que inspeccione el sitio (igual que la de TomTom). ORS no
- * permite restringir por dominio, así que la protección real es la cuota diaria
- * y vigilar el consumo en el dashboard de ORS. Si se deja vacía, el botón
- * Isócronas explica cómo obtener la clave en lugar de fallar.
+ * El proxy no es un reenviador ciego: solo acepta isócronas a pie, dentro de
+ * Aguascalientes y con topes por IP y por día (ver proxy/validar.js).
+ *
+ * Vacío = modo "A pie" deshabilitado, con un mensaje que lo explica. El modo
+ * Auto (TomTom) no depende de esto.
  */
-const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImQwYTg2MjM5ODIyMDQyZmM4MjNkNzQyOGM0ZWExODNhIiwiaCI6Im11cm11cjY0In0=";
+const ORS_PROXY_URL = "https://radar-inmobiliario-ags-proxy.onrender.com";
