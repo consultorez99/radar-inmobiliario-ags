@@ -590,6 +590,7 @@ function renderIsoPanel(s, { loading = false, error = null } = {}) {
       bandas: s.bands.map((b, i) => ({
         poly: b.full,
         pop: s.mercado?.[i]?.pop ?? null,
+        gasto: s.mercado?.[i]?.gasto ?? null,
         label: `≤${b.min}${i === s.bands.length - 1 ? " min" : ""}`,
       })),
     });

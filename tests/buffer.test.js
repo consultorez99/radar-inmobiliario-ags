@@ -481,8 +481,12 @@ test("mercado potencial: el archivo generado cubre casi todas las AGEBs y el tot
   // cada categoría es un modelo aparte: la suma no tiene que cuadrar exacto
   // con el total, pero sí andar cerca (la ENIGH tiene rubros menores fuera de
   // estas categorías, p. ej. transferencias)
+  // solo categorías: las subcategorías (medicamentos, combustible…) ya están dentro de ellas
+  const cats = Object.entries(g.meta.modelos)
+    .filter(([k, m]) => k !== "total" && m.nivel === "categoria").map(([k]) => k);
+  assert.equal(cats.length, 9);
   for (const v of Object.values(g.agebs).slice(0, 50)) {
-    const suma = Object.entries(v).filter(([k]) => k !== "total").reduce((s, [, x]) => s + x, 0);
+    const suma = cats.reduce((s, k) => s + v[k], 0);
     assert.ok(suma > v.total * 0.75 && suma < v.total * 1.1, `${suma} vs ${v.total}`);
   }
 });

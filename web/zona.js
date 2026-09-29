@@ -215,7 +215,7 @@ function renderZonePanel(s) {
   window.Competencia?.montar(el.querySelector(".comp-slot"), {
     tipo: "poligono",
     centro: null,
-    bandas: [{ poly: currentZone, pop: s.pop, label: "la zona" }],
+    bandas: [{ poly: currentZone, pop: s.pop, gasto: s.gasto, label: "la zona" }],
   });
 }
 

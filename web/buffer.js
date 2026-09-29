@@ -479,7 +479,7 @@ function renderBufferPanel(s) {
     window.Competencia?.montar(el.querySelector(".comp-slot"), {
       tipo: "radio",
       centro: { lat: s.lat, lng: s.lng },
-      bandas: [{ poly: bufferCircle(s.lat, s.lng, s.radiusKm), pop: s.demo.pop, label: `${s.radiusKm} km` }],
+      bandas: [{ poly: bufferCircle(s.lat, s.lng, s.radiusKm), pop: s.demo.pop, gasto: s.gasto, label: `${s.radiusKm} km` }],
     });
   }
 }

@@ -94,3 +94,51 @@ test("DENUE real: 'farmacia' encuentra los giros de farmacia con cientos de nego
   // todos los rangos de tamaño del DENUE caen en un grupo conocido
   for (const t of data.tamanos) assert.notEqual(C.grupoTamano(t), "sd", t);
 });
+
+// ------------------------------------------------ mercado por competidor
+test("rubro por giro: el gasto que atiende cada negocio, específico antes que general", () => {
+  assert.equal(C.rubroDeGiro("Farmacias sin minisúper"), "medicamentos");
+  assert.equal(C.rubroDeGiro("Comercio al por menor de gasolina y diesel"), "combustible");
+  assert.equal(C.rubroDeGiro("Restaurantes con servicio de preparación de tacos y tortas"), "alimentos_fuera");
+  assert.equal(C.rubroDeGiro("Comercio al por menor en tiendas de abarrotes, ultramarinos y misceláneas"), "alimentos_hogar");
+  assert.equal(C.rubroDeGiro("Salones y clínicas de belleza y peluquerías"), "cuidados_personales");
+  assert.equal(C.rubroDeGiro("Centros de acondicionamiento físico del sector privado"), "esparcimiento");
+  assert.equal(C.rubroDeGiro("Escuelas de deporte del sector privado"), "esparcimiento");
+  assert.equal(C.rubroDeGiro("Escuelas de educación primaria del sector privado"), "educacion");
+  assert.equal(C.rubroDeGiro("Consultorios dentales del sector privado"), "consultas");
+  assert.equal(C.rubroDeGiro("Comercio al por menor de ropa, excepto de bebé y lencería"), "vestido");
+  assert.equal(C.rubroDeGiro("Comercio al por menor de calzado"), "calzado");
+});
+
+test("rubro por giro: mayoreo, industria y giros sin rubro claro no inventan mercado", () => {
+  assert.equal(C.rubroDeGiro("Comercio al por mayor de abarrotes"), null);
+  assert.equal(C.rubroDeGiro("Fabricación de equipo no electrónico para uso médico, dental y para laboratorio"), null);
+  assert.equal(C.rubroDeGiro("Servicios veterinarios para mascotas prestados por el sector privado"), null);
+  assert.equal(C.rubroDeGiro("Agencias de anuncios publicitarios"), null);
+  assert.equal(C.rubroDeGiros(["Agencias de anuncios publicitarios", "Farmacias con minisúper"]), "medicamentos");
+  assert.equal(C.rubroDeGiros([]), null);
+});
+
+test("mercado por competidor: reparto actual y con un competidor más", () => {
+  assert.deepEqual(C.mercadoPorCompetidor(1000, 4), { porCompetidor: 250, siEntraUnoMas: 200 });
+  // sin competencia: todo el mercado para el que entre, y no se divide entre cero
+  assert.deepEqual(C.mercadoPorCompetidor(1000, 0), { porCompetidor: null, siEntraUnoMas: 1000 });
+  assert.deepEqual(C.mercadoPorCompetidor(0, 3), { porCompetidor: null, siEntraUnoMas: null });
+});
+
+test("DENUE real: los giros más comunes de comercio y servicios al consumidor tienen rubro", () => {
+  const data = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "data", "ags_denue_negocios.json"), "utf8"));
+  const gasto = JSON.parse(fs.readFileSync(
+    path.join(__dirname, "..", "data", "ags_gasto_ageb.json"), "utf8"));
+  const tot = C.totalesPorGiro(data);
+  // todo rubro asignado existe en el archivo de gasto (una errata dejaría el bloque vacío)
+  for (const nombre of data.actividades) {
+    const r = C.rubroDeGiro(nombre);
+    if (r) assert.ok(gasto.meta.modelos[r], `${nombre} -> ${r} no existe en ags_gasto_ageb.json`);
+  }
+  for (const q of ["farmacia", "abarrotes", "belleza", "cafeterias", "ropa", "papeleria"].slice(0, 5)) {
+    const g = C.buscarGiros(data, tot, q)[0];
+    assert.ok(C.rubroDeGiro(g.nombre), `${g.nombre} sin rubro`);
+  }
+});

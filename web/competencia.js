@@ -11,6 +11,12 @@
  * al sitio y el reparto por tamaño (micro / pequeño / mediano o grande), y
  * pinta los competidores en el mapa a cualquier zoom.
  *
+ * Mercado por competidor: si hay estimación de gasto (gasto.js), el giro se
+ * asocia al rubro de gasto que atiende (farmacias -> medicamentos,
+ * gasolineras -> combustible; CompetenciaCore.rubroDeGiro) y se divide el
+ * gasto anual de ese rubro en el área entre los competidores. El rubro se
+ * puede cambiar a mano en el bloque.
+ *
  * Si el usuario cargó su propio archivo ("Mis puntos", mispuntos.js), el
  * bloque también cuenta cuántos de SUS puntos caen en cada área: sucursales
  * propias (canibalización), clientes o sitios candidatos.
@@ -32,6 +38,7 @@ let compCtx = null;             // { slot, tipo, centro, bandas: [{ poly, pop, l
 let compResultado = null;       // último cálculo (lo lee el reporte PDF)
 let compPropios = null;         // lo mismo para los puntos del usuario (Mis puntos)
 let compTotales = null;         // negocios por giro, para ordenar sugerencias
+let compRubroManual = null;     // rubro de gasto elegido a mano (null = automático por giro)
 
 const compGroup = L.featureGroup().addTo(map);
 
@@ -53,6 +60,14 @@ function compResolverPendientes(data) {
     if (idx >= 0 && compGiros.size < COMP_MAX_GIROS) compGiros.add(idx);
   }
   compPendientes = null;
+}
+
+// "$1.2 M" arriba de un millón, "$850,000" abajo: el mercado por
+// competidor de un giro muy atomizado cabe en miles
+function compDinero(x) {
+  if (x == null) return "—";
+  if (x >= 1e6) return `$${(x / 1e6).toLocaleString("es-MX", { maximumFractionDigits: x >= 1e8 ? 0 : 1 })} M`;
+  return fmtMXN(Math.round(x / 1000) * 1000);
 }
 
 // ------------------------------------------------------------------ cálculo
@@ -77,14 +92,35 @@ function compPorBandas(candidatos, ctx) {
   return bandas;
 }
 
-function compCalcular(data, ctx) {
+/* Rubro de gasto contra el que se mide la competencia: el elegido a mano o
+ * el que corresponde a los giros. null si no hay estimación de gasto o el
+ * giro no tiene un rubro claro (y nadie eligió uno). */
+function compRubro(giros) {
+  const modelos = DATA.gasto?.meta?.modelos;
+  if (!modelos) return null;
+  const auto = CompetenciaCore.rubroDeGiros(giros);
+  const clave = compRubroManual && modelos[compRubroManual] ? compRubroManual : auto;
+  if (!clave || !modelos[clave]) return { clave: null, auto };
   return {
-    tipo: ctx.tipo,
-    giros: [...compGiros].map((i) => data.actividades[i]),
-    centro: ctx.centro,
-    bandas: compPorBandas(CompetenciaCore.negociosDeGiros(data, compGiros), ctx),
-    corte: data.meta.corte,
+    clave, auto,
+    manual: clave !== auto,
+    etiqueta: modelos[clave].etiqueta,
+    baja: modelos[clave].confianza === "baja",
   };
+}
+
+function compCalcular(data, ctx) {
+  const giros = [...compGiros].map((i) => data.actividades[i]);
+  const rubro = compRubro(giros);
+  const bandas = compPorBandas(CompetenciaCore.negociosDeGiros(data, compGiros), ctx);
+  if (rubro?.clave) {
+    bandas.forEach((b, i) => {
+      const gasto = ctx.bandas[i].gasto?.anual?.[rubro.clave] ?? null;
+      b.gastoRubro = gasto;
+      Object.assign(b, CompetenciaCore.mercadoPorCompetidor(gasto, b.n));
+    });
+  }
+  return { tipo: ctx.tipo, giros, rubro, centro: ctx.centro, bandas, corte: data.meta.corte };
 }
 
 function compCalcularPropios(ctx) {
@@ -124,6 +160,60 @@ function compDibujar(res) {
 }
 
 // ------------------------------------------------------------------- panel
+/* Selector de rubro + mercado por competidor. Vacío si no cargó el gasto. */
+function compMercadoHTML(res) {
+  if (!res.rubro) return "";
+  const modelos = DATA.gasto.meta.modelos;
+  const autoEtq = res.rubro.auto ? modelos[res.rubro.auto]?.etiqueta : null;
+  const grupo = (nivel) => Object.entries(modelos)
+    .filter(([, m]) => (m.nivel || "categoria") === nivel)
+    .sort((a, b) => a[1].etiqueta.localeCompare(b[1].etiqueta))
+    .map(([k, m]) => `<option value="${k}" ${res.rubro.manual && k === res.rubro.clave ? "selected" : ""}>${compEsc(m.etiqueta)}</option>`)
+    .join("");
+  const opciones = `<optgroup label="Rubros específicos">${grupo("subcategoria")}</optgroup>
+    <optgroup label="Categorías amplias">${grupo("categoria")}</optgroup>`;
+  const selector = `
+    <label class="comp-rubro-label">Se compara contra el gasto en
+      <select class="comp-rubro" aria-label="Rubro de gasto">
+        <option value="" ${res.rubro.manual ? "" : "selected"}>${autoEtq ? `${compEsc(autoEtq)} (según el giro)` : "— elige un rubro —"}</option>
+        ${opciones}
+      </select></label>`;
+
+  if (!res.rubro.clave) {
+    return `<div class="comp-mercado">${selector}
+      <div class="iso-sub">Este giro no tiene un rubro de gasto claro de los hogares; elige uno para
+        calcular el mercado por competidor.</div></div>`;
+  }
+
+  const ext = res.bandas[res.bandas.length - 1];
+  const varias = res.bandas.length > 1;
+  const cifras = varias
+    ? `<div class="buffer-table-wrap iso-mercado-wrap"><table class="buffer-table iso-table iso-mercado">
+        <tr><th>Al año</th>${res.bandas.map((b) => `<th>${compEsc(b.label)}</th>`).join("")}</tr>
+        <tr><td>Gasto del rubro</td>${res.bandas.map((b) => `<td>${compDinero(b.gastoRubro)}</td>`).join("")}</tr>
+        <tr><td><strong>Por competidor</strong></td>${res.bandas.map((b) => `<td><strong>${b.n ? compDinero(b.porCompetidor) : "sin comp."}</strong></td>`).join("")}</tr>
+        <tr><td>Si entra uno más</td>${res.bandas.map((b) => `<td>${compDinero(b.siEntraUnoMas)}</td>`).join("")}</tr>
+       </table></div>`
+    : `<div class="zone-cards">
+        <div class="zone-card"><div class="zc-label">Gasto del rubro</div>
+          <div class="zc-value">${compDinero(ext.gastoRubro)}</div>
+          <div class="zc-sub">al año en ${compEsc(ext.label)}</div></div>
+        <div class="zone-card"><div class="zc-label">Por competidor</div>
+          <div class="zc-value" style="color:${COMP_COLOR}">${ext.n ? compDinero(ext.porCompetidor) : "—"}</div>
+          <div class="zc-sub">${ext.n ? `al año, entre ${ext.n}` : "sin competidores: mercado sin atender"}</div></div>
+       </div>
+       <div class="comp-linea">Si entra uno más: <strong>${compDinero(ext.siEntraUnoMas)}</strong> al año
+         para cada uno, repartido parejo entre ${ext.n + 1}.</div>`;
+
+  const baja = res.rubro.baja
+    ? ` El gasto en este rubro casi no varía entre zonas en la ENIGH: aquí el mercado depende sobre todo de cuántos hogares hay, no de su nivel.`
+    : "";
+  return `<div class="comp-mercado">${selector}${cifras}
+    <div class="iso-sub">Gasto de los hogares del área (estimación ENIGH 2024), no ventas: parte se compra
+      fuera del área y otros tipos de negocio también lo capturan${res.rubro.clave === "medicamentos"
+        ? " (p. ej. supermercados venden medicamentos)" : ""}.${baja}</div></div>`;
+}
+
 function compResultadosHTML(res) {
   const ext = res.bandas[res.bandas.length - 1];
   const varias = res.bandas.length > 1;
@@ -160,7 +250,7 @@ function compResultadosHTML(res) {
   const mas = ext.n > COMP_LISTA_MAX
     ? `<div class="bf-more">… y ${ext.n - COMP_LISTA_MAX} más (magenta en el mapa)</div>` : "";
 
-  return `${tabla}${cercano}${tamanos}
+  return `${tabla}${compMercadoHTML(res)}${cercano}${tamanos}
     ${lista ? `<div class="comp-lista">${lista}${mas}</div>` : ""}
     <div class="iso-sub">DENUE ${compEsc(res.corte)} contra población del Censo 2020: la saturación es
       orientativa. Distancias en línea recta, no por calle.</div>`;
@@ -229,9 +319,16 @@ function compConectar(ctx, data) {
   ctx.slot.querySelectorAll(".comp-chip-x").forEach((btn) => {
     btn.addEventListener("click", () => {
       compGiros.delete(Number(btn.dataset.idx));
+      if (!compGiros.size) compRubroManual = null;
       compRender();
       window.plActualizar?.();
     });
+  });
+
+  ctx.slot.querySelector(".comp-rubro")?.addEventListener("change", (e) => {
+    compRubroManual = e.target.value || null;
+    compRender();
+    window.plActualizar?.();
   });
 
   const input = ctx.slot.querySelector(".comp-input");
@@ -293,6 +390,8 @@ window.Competencia = {
     if (!data) return compPendientes || [];
     return [...compGiros].map((i) => data.actividades[i]);
   },
+  rubroManual: () => compRubroManual,
+  fijarRubro(clave) { compRubroManual = clave || null; },
   fijarGiros(nombres) {
     compGiros.clear();
     compPendientes = nombres.slice(0, COMP_MAX_GIROS);

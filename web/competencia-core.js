@@ -129,8 +129,66 @@
     };
   }
 
+  /* Giro DENUE (nombre SCIAN) -> rubro de gasto de los hogares (clave de
+   * data/ags_gasto_ageb.json) que ese negocio atiende. Reglas en orden: la
+   * primera que coincide gana, así que las específicas van antes ("escuelas
+   * de deporte" es esparcimiento, no educación). null si no hay un rubro
+   * claro: mayoreo, industria o servicios a empresas no venden al gasto de
+   * los hogares, y un rubro inventado daría un "mercado" falso. */
+  const RUBROS_POR_GIRO = [
+    [/al por mayor|^fabricacion|^confeccion|^industria|^construccion|^edificacion|^mineria/, null],
+    [/veterinari|mascotas/, null],
+    [/farmacia/, "medicamentos"],
+    // antes que "clínica": "Salones y clínicas de belleza" no es atención médica
+    [/belleza|peluqueria|barberia|perfum|cosmetic|masaje|spa\b|tatuaje|manicur/, "cuidados_personales"],
+    [/hospital/, "hospital"],
+    [/consultorio|clinica|laboratorio|medic|dental|psicolog|optometr|terapia|enfermer/, "consultas"],
+    [/lentes|optica/, "salud"],
+    [/gasolina|diesel/, "combustible"],
+    [/restaurante|cafeteria|bares|cantina|centros nocturnos|antojitos|alimentos para consumo inmediato|fonda|loncheria/, "alimentos_fuera"],
+    [/abarrotes|supermercado|minisuper|carnes|frutas|verduras|panificacion|tortillas|leche|dulces|semillas|huevo|pescados|cerveza|vinos|licores|bebidas|hielo|agua purificada|paletas|nieve|al por menor de otros alimentos/, "alimentos_hogar"],
+    [/zapato|calzado/, "calzado"],
+    [/ropa|boneteria|lenceria|telas|uniformes/, "vestido"],
+    [/telefon|celular|telecomunicaciones/, "comunicaciones"],
+    [/acondicionamiento fisico|deport|exhibicion de peliculas|parques|juegos|recreativ|boliche|billar|museo|teatro|jugueter|libros|instrumentos musicales|bicicletas/, "esparcimiento"],
+    // los útiles escolares cuentan como gasto en educación en la ENIGH
+    [/escuela|educacion|guarderia|academia|capacitacion|idiomas|papeleria/, "educacion"],
+    [/joyeria|relojes|bolsas|bisuteria/, "cuidado_personal"],
+    [/lavanderia|tintoreria|ferreteria|tlapaleria|muebles|electrodomestic|linea blanca|articulos (de|para la) limpieza|cristaleria|blancos|decoracion/, "limpieza_hogar"],
+    // Talleres, refacciones y llantas se quedan SIN rubro a propósito: el
+    // único que los contiene ("transporte") incluye compra de autos y
+    // telefonía, e inflaría su mercado varias veces. Se elige a mano.
+  ];
+
+  function rubroDeGiro(nombreGiro) {
+    const n = normalizar(nombreGiro);
+    for (const [re, rubro] of RUBROS_POR_GIRO) if (re.test(n)) return rubro;
+    return null;
+  }
+
+  /* Rubro de un conjunto de giros: el que comparten todos, o el del primero
+   * que tenga rubro si difieren (quien elige "farmacias" y luego "consultorios"
+   * empezó por lo que le importa). null si ninguno tiene. */
+  function rubroDeGiros(nombres) {
+    const rubros = nombres.map(rubroDeGiro).filter(Boolean);
+    return rubros.length ? rubros[0] : null;
+  }
+
+  /* Mercado por competidor: gasto anual del rubro en el área entre los
+   * competidores, y lo que le tocaría a uno nuevo si el gasto se repartiera
+   * parejo entre n + 1. Sin competidores no hay división que hacer: el
+   * mercado entero está sin atender (porCompetidor = null). */
+  function mercadoPorCompetidor(gastoAnualRubro, n) {
+    if (!(gastoAnualRubro > 0)) return { porCompetidor: null, siEntraUnoMas: null };
+    return {
+      porCompetidor: n > 0 ? gastoAnualRubro / n : null,
+      siEntraUnoMas: gastoAnualRubro / (n + 1),
+    };
+  }
+
   return {
     normalizar, totalesPorGiro, buscarGiros, negociosDeGiros,
     haversineKm, grupoTamano, resumenCompetencia,
+    rubroDeGiro, rubroDeGiros, mercadoPorCompetidor,
   };
 });

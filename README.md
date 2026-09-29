@@ -191,6 +191,24 @@ calcula:
 - **Por tamaño** (personal ocupado según DENUE): micro ≤10, pequeño 11–50,
   mediano o grande 51+ — separa a la tiendita de la cadena.
 
+- **Mercado por competidor** — el gasto anual de los hogares del área en
+  el rubro que atiende el giro, entre los competidores, y cuánto le tocaría
+  a cada uno si entra uno más (reparto parejo entre n + 1). El rubro se
+  asigna solo (`rubroDeGiro()` en `web/competencia-core.js`: farmacias →
+  medicamentos, gasolineras → combustible, estéticas → cuidados
+  personales, escuelas → educación…) y se puede cambiar en el bloque
+  (`&rubro=` en el permalink). Mayoreo, industria, talleres y giros sin
+  rubro claro de los hogares se quedan sin asignar a propósito: el único
+  rubro que contiene a un taller ("transporte") incluye compra de autos y
+  telefonía e inflaría su mercado. Para esto `build_gasto.py` modela
+  también subcategorías (medicamentos, consultas, hospital, vestido,
+  calzado, combustible, comunicaciones, educación, esparcimiento, cuidados
+  personales). Ojo: en salud el modelo casi no distingue zonas (R² por UPM
+  < 0.1) — el mercado de una farmacia depende sobre todo de cuántos hogares
+  hay, y el panel lo dice. Es gasto de los hogares, no ventas: parte se
+  compra fuera del área y otros formatos (supermercados) también lo
+  capturan.
+
 Los competidores se pintan en magenta en el mapa a cualquier zoom, los giros
 viajan en el permalink (`&giro=Nombre|Nombre`, por nombre y no por índice
 para sobrevivir a una regeneración del DENUE) y la sección entra en los tres

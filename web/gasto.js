@@ -27,7 +27,9 @@ window.GastoUI = {
    * modelo es de confianza baja (apenas distingue zonas). */
   categorias() {
     const mod = DATA.gasto?.meta?.modelos || {};
-    return Object.entries(mod).filter(([k]) => k !== "total")
+    // las subcategorías (medicamentos, combustible…) ya están dentro de su
+    // categoría: solo las usa el mercado por competidor (competencia.js)
+    return Object.entries(mod).filter(([k, m]) => k !== "total" && m.nivel !== "subcategoria")
       .sort((a, b) => b[1].promedio_enigh_trim - a[1].promedio_enigh_trim)
       .map(([k, m]) => ({ clave: k, etiqueta: m.etiqueta, baja: m.confianza === "baja" }));
   },

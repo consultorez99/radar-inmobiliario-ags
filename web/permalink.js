@@ -8,6 +8,7 @@
  *   &iso=LAT,LNG,MODO,MAX     isócronas (MODO=car|pedestrian; MAX=min de la banda exterior; excluyente con buf/pol)
  *   &pol=LAT,LNG;LAT,LNG;...  polígono dibujado (excluyente con buf)
  *   &giro=NOMBRE|NOMBRE       giros del bloque de competencia (nombre SCIAN del DENUE)
+ *   &rubro=CLAVE              rubro de gasto elegido a mano para el mercado por competidor
  *
  * Se actualiza en vivo con history.replaceState (sin ensuciar el historial) y
  * se restaura al cargar: la vista de inmediato, y capa/overlays/análisis al
@@ -71,6 +72,8 @@ function plActualizar() {
     }
     const giros = window.Competencia?.nombresGiros() || [];
     if (giros.length) partes.push(`giro=${encodeURIComponent(giros.join("|"))}`);
+    const rubro = window.Competencia?.rubroManual();
+    if (giros.length && rubro) partes.push(`rubro=${encodeURIComponent(rubro)}`);
     history.replaceState(null, "", "#" + partes.join("&"));
   }, 250);
 }
@@ -93,6 +96,7 @@ window.plRestaurar = function () {
   }
   // antes de los análisis: el bloque de competencia se monta al pintar el panel
   if (p.giro) window.Competencia?.fijarGiros(p.giro.split("|").filter(Boolean));
+  if (p.giro && p.rubro) window.Competencia?.fijarRubro(p.rubro);
   if (p.buf) {
     const [lat, lng, r] = p.buf.split(",").map(Number);
     if ([lat, lng, r].every(Number.isFinite) && r > 0 && r <= 20) {

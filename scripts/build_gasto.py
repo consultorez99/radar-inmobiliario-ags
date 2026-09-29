@@ -67,6 +67,23 @@ CATEGORIAS = [
     ("personales", "cuidado_personal", "Cuidado personal y otros gastos"),
 ]
 
+# Subcategorías: no van en la tabla principal de la app (se traslaparían con
+# su categoría), pero sirven para el "mercado por competidor": a una farmacia
+# le corresponde el gasto en medicamentos, no todo el de salud; a una
+# gasolinera, el de combustible, no todo el de transporte.
+SUBCATEGORIAS = [
+    ("medic_prod", "medicamentos", "Medicamentos sin receta y material de curación"),
+    ("ambul_serv", "consultas", "Atención médica ambulatoria (consultas, estudios, medicamentos recetados)"),
+    ("aten_hosp", "hospital", "Atención hospitalaria"),
+    ("vestido", "vestido", "Vestido"),
+    ("calzado", "calzado", "Calzado"),
+    ("combus", "combustible", "Combustible para vehículos"),
+    ("comunica", "comunicaciones", "Comunicaciones (telefonía, internet)"),
+    ("educacion", "educacion", "Educación (colegiaturas, útiles, cursos)"),
+    ("esparci", "esparcimiento", "Esparcimiento (deporte, cine, recreación)"),
+    ("cuida_pers", "cuidados_personales", "Cuidados personales (estética, artículos de higiene)"),
+]
+
 VARIABLES = ["anios_esc", "inter", "pc", "auto", "serv", "ocup_cuarto", "integrantes"]
 
 # nivel educativo del jefe (catálogo ENIGH educa_jefe) -> años aproximados de
@@ -183,7 +200,9 @@ def main():
     print(f"Hogares por vivienda (ENIGH, 001+005 urbano): {hog_por_viv:.3f}")
     print(f"AGEBs con las {len(VARIABLES)} variables: {completos.sum()} de {len(ag)}\n")
     print(f"{'categoría':<26}{'R² hogar':>9}{'R² CV':>8}{'R² UPM':>8}{'ENIGH $/trim':>14}{'factor':>8}{'AGEBs<0':>8}")
-    for col, clave, etiqueta in CATEGORIAS:
+    todas = [(c, k, e, "categoria") for c, k, e in CATEGORIAS] + \
+            [(c, k, e, "subcategoria") for c, k, e in SUBCATEGORIAS]
+    for col, clave, etiqueta, nivel in todas:
         y = urb[col].to_numpy(float)
         beta = wls(X, y, w)
         pred = beta[0] + Xa @ beta[1:]
@@ -196,6 +215,7 @@ def main():
         pred = pred * factor
         modelos[clave] = {
             "etiqueta": etiqueta,
+            "nivel": nivel,
             "columna_enigh": col,
             "coeficientes": dict(zip(["intercepto"] + VARIABLES, [round(float(b), 2) for b in beta])),
             "r2_hogar": round(float(r2(y, beta[0] + X @ beta[1:], w)), 3),

@@ -420,6 +420,31 @@ function seccionCompetenciaPDF(doc, y, salto) {
   } else {
     linea(`Competidores en ${ext.label}: ${ext.n}   ·   Habitantes por negocio: ${fmt(ext.habPorNegocio)}`, 9.5);
   }
+  // mercado por competidor: gasto anual del rubro que atiende el giro
+  if (res.rubro?.clave) {
+    const dinero = (x) => (x == null ? "—" : x >= 1e6
+      ? `$${(x / 1e6).toLocaleString("es-MX", { maximumFractionDigits: x >= 1e8 ? 0 : 1 })} M`
+      : fmtMXN(Math.round(x / 1000) * 1000));
+    linea(`Mercado por competidor — rubro de gasto: ${res.rubro.etiqueta}` +
+      `${res.rubro.manual ? " (elegido a mano)" : " (según el giro)"}.`, 9);
+    if (res.bandas.length > 1) {
+      for (const b of res.bandas) {
+        linea(`${b.label.replace("≤", "hasta ")}: gasto ${dinero(b.gastoRubro)} al año · ` +
+          `${b.n ? `${dinero(b.porCompetidor)} por competidor` : "sin competidores"} · ` +
+          `si entra uno más, ${dinero(b.siEntraUnoMas)} cada uno.`, 8.5, 0.9);
+      }
+    } else {
+      linea(`Gasto de los hogares en el rubro: ${dinero(ext.gastoRubro)} al año · ` +
+        `${ext.n ? `por competidor: ${dinero(ext.porCompetidor)}` : "sin competidores: mercado sin atender"} · ` +
+        `si entra uno más: ${dinero(ext.siEntraUnoMas)} para cada uno (reparto parejo).`, 9);
+    }
+    doc.setTextColor(110, 100, 130);
+    linea("Es gasto estimado de los hogares del área (ENIGH 2024), no ventas: parte se compra fuera del área y " +
+      "otros tipos de negocio también lo capturan." +
+      (res.rubro.baja ? " En este rubro el gasto casi no varía entre zonas: el mercado depende sobre todo del número de hogares." : ""),
+      8, 1.4);
+    doc.setTextColor(40, 40, 40);
+  }
   if (ext.masCercano) {
     linea(`Más cercano al sitio: ${ext.masCercano.nombre}, a ${km(ext.masCercano.distKm)} en línea recta.`);
   }
