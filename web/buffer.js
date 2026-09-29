@@ -46,6 +46,35 @@ function bboxesOverlap(a, b) {
   return !(a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1]);
 }
 
+/* AGEBs que tocan un polígono, cada una con la fracción de su área que cae
+ * dentro (la base de la interpolación areal). La comparten el radio y las
+ * isócronas para que ambos cuenten la población exactamente igual.
+ * `candidatas` permite acotar la búsqueda: con bandas anidadas, una AGEB que
+ * no toca la banda exterior tampoco toca las interiores. */
+function agebsEnPoligono(poly, candidatas = DATA.agebs.features) {
+  const polyBbox = turf.bbox(poly);
+  const rows = [];
+  let areaKm2 = 0;
+  for (const f of candidatas) {
+    if (!bboxesOverlap(featureBbox(f), polyBbox)) continue;
+    let inter = null;
+    try { inter = turf.intersect(poly, f); } catch (err) { continue; }
+    if (!inter) continue;
+    const aIn = turf.area(inter) / 1e6;
+    if (!(aIn > 0)) continue;
+    if (f.__areaKm2 == null) f.__areaKm2 = turf.area(f) / 1e6;
+    const aTot = f.__areaKm2;
+    rows.push({
+      frac: aTot > 0 ? Math.min(1, aIn / aTot) : 0,
+      areaKm2: aIn,
+      props: f.properties,
+      feature: f,
+    });
+    areaKm2 += aIn;
+  }
+  return { rows, areaKm2 };
+}
+
 function analyzeBuffer(lat, lng, radiusKm) {
   const key = `${lat.toFixed(6)}|${lng.toFixed(6)}|${radiusKm}`;
   if (bufferCache.has(key)) return bufferCache.get(key);
@@ -56,25 +85,9 @@ function analyzeBuffer(lat, lng, radiusKm) {
   const centerPt = turf.point([lng, lat]);
 
   // AGEBs: intersección con fracción de área (interpolación areal)
-  const agebRows = [];
-  let agebAreaKm2 = 0;
-  for (const f of DATA.agebs.features) {
-    if (!bboxesOverlap(featureBbox(f), circleBbox)) continue;
-    let inter = null;
-    try { inter = turf.intersect(circle, f); } catch (err) { continue; }
-    if (!inter) continue;
-    const aIn = turf.area(inter) / 1e6;
-    if (!(aIn > 0)) continue;
-    const aTot = turf.area(f) / 1e6;
-    agebRows.push({
-      frac: aTot > 0 ? Math.min(1, aIn / aTot) : 0,
-      areaKm2: aIn,
-      props: f.properties,
-      feature: f,
-    });
-    agebAreaKm2 += aIn;
-  }
+  const { rows: agebRows, areaKm2: agebAreaKm2 } = agebsEnPoligono(circle);
   const demo = BufferCore.aggregateDemographics(agebRows);
+  const gasto = window.GastoUI?.calcular(agebRows) || null;
   const pctSinAgeb = BufferCore.coverageSinAgeb(agebAreaKm2, areaKm2);
 
   // Proyección de población (CONAPO 1990-2040): dato de contexto a nivel
@@ -134,7 +147,7 @@ function analyzeBuffer(lat, lng, radiusKm) {
 
   const stats = {
     lat, lng, radiusKm, areaKm2, agebRows, agebAreaKm2, pctSinAgeb,
-    demo, poblacionMunicipios, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
+    demo, gasto, poblacionMunicipios, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
   };
   bufferCache.set(key, stats);
   if (bufferCache.size > 30) bufferCache.delete(bufferCache.keys().next().value);
@@ -233,6 +246,7 @@ window.getBufferStats = () => bufferStats;
 window.clearBufferAnalysis = function (hidePanel = true) {
   bufferGroup.clearLayers();
   bufferStats = null;
+  window.Competencia?.limpiar();
   stopBufferPicking();
   document.getElementById("btn-buffer").classList.remove("active");
   document.getElementById("btn-csv").classList.add("hidden");
@@ -396,6 +410,8 @@ function bufferResultsHTML(s) {
       <span>3+ cuartos <strong>${bfPct(d.pct3cuart)}</strong></span>
     </div>
     <div class="zone-list"><strong>NSE (% de población):</strong><br>${nseRows || "s/d"}</div>
+    ${window.GastoUI?.html([{ label: `${s.radiusKm} km`, mp: s.gasto }]) || ""}
+    <div class="comp-slot"></div>
     <div class="zone-list"><strong>Valor catastral suelo 2026</strong>
       ${s.catStats ? `· ${s.catStats.n} colonias · min ${fmtMXN(s.catStats.min)} ·
       mediana ${fmtMXN(Math.round(s.catStats.med))} · max ${fmtMXN(s.catStats.max)} /m²` : ""}
@@ -459,6 +475,13 @@ function renderBufferPanel(s) {
   });
 
   renderBufferCharts(s);
+  if (s) {
+    window.Competencia?.montar(el.querySelector(".comp-slot"), {
+      tipo: "radio",
+      centro: { lat: s.lat, lng: s.lng },
+      bandas: [{ poly: bufferCircle(s.lat, s.lng, s.radiusKm), pop: s.demo.pop, gasto: s.gasto, label: `${s.radiusKm} km` }],
+    });
+  }
 }
 
 function renderBufferCharts(s) {
@@ -627,7 +650,7 @@ function exportBufferSHP() {
   const bytes = ShapefileZip.desdeCapas(capas, [{
     nombre: "LEEME.txt",
     datos: new TextEncoder().encode(
-      window.leemeSIG(`radio de ${radiusKm} km desde ${lat.toFixed(5)}, ${lng.toFixed(5)} (${areaKm2.toFixed(2)} km²)`, true)),
+      window.leemeSIG(`radio de ${radiusKm} km desde ${lat.toFixed(5)}, ${lng.toFixed(5)} (${areaKm2.toFixed(2)} km²)`)),
   }]);
   window.descargarZip(bytes, `zona-influencia_${lat.toFixed(5)}_${lng.toFixed(5)}_${radiusKm}km_shp.zip`);
 }

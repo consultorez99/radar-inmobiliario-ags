@@ -44,7 +44,11 @@ Herramientas interactivas:
 - **Zona de estudio**: dibuja un polígono (botón bajo el zoom) y obtén
   población, NSE predominante, estadísticas de valor catastral, rangos de
   mercado, % de uso de suelo del PDU y gráficos (composición NSE + histograma
-  catastral). Cálculo 100% en el navegador con Turf.js.
+  catastral). Cálculo 100% en el navegador con Turf.js. La población y demás
+  variables censales usan la **misma interpolación areal que el radio** (cada
+  AGEB aporta la fracción de su área dentro del polígono); hasta sep-2026 se
+  sumaban AGEBs completas, lo que inflaba polígonos que rozaban AGEBs grandes
+  — el JSON de polígono subió a `schema_version: 2` por ese cambio.
 - **Reporte PDF** de la zona dibujada (2 páginas: indicadores + captura del
   mapa, gráficos y tabla de colonias con fuentes y disclaimer).
 - **Comparador**: botón "⚖️ Comparar" en los popups de la capa Catastral para
@@ -54,6 +58,11 @@ Herramientas interactivas:
   direcciones comparte el análisis tal cual se ve
   (`#map=13/21.88/-102.29&capa=pdu&buf=21.88,-102.29,1.5`). Ver
   `web/permalink.js`.
+- **Geomarketing**: las isócronas calculan el mercado alcanzable (población y
+  hogares por segmento NSE en cada banda de tiempo) y los tres análisis
+  (radio, isócronas, polígono) traen un bloque de **competencia** por giro
+  DENUE. Con "Mis puntos" se cargan las sucursales o clientes propios (CSV,
+  Excel o GeoJSON, sin salir del navegador). Ver "Geomarketing" abajo.
 - Panel de capas, leyendas flotantes y modal "Acerca de".
 
 > ⚠️ **Proyecto independiente.** Sin afiliación con RadarMX, AMAI ni otros proveedores comerciales de datos.
@@ -87,6 +96,7 @@ data/
   ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
   ags_denue_proxy.json    # NSE estimado EXPERIMENTAL (Bajo/Medio/Alto) en 20 zonas sin AGEB 2020,
                              # modelo calibrado con DENUE — no es dato censal, ver metodología en README abajo
+  ags_gasto_ageb.json     # gasto trimestral estimado por hogar y categoría, por AGEB (ENIGH 2024 + Censo 2020)
   ags_denue_negocios.json # directorio DENUE completo: 57,931 negocios (Ags + JM), sin modelo,
                              # formato compacto (arrays posicionales, ver meta.esquema en el archivo)
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
@@ -98,6 +108,7 @@ scripts/
   build_denue_proxy.py       # calibra el modelo NSE-por-DENUE y genera la capa "Estimado" (ver metodología abajo)
   build_denue_negocios.py    # exporta el directorio DENUE completo (dato crudo) para la capa "Negocios"
   build_shf.py               # parsea el XLSX de datos abiertos del Índice SHF (descarga trimestral manual)
+  build_gasto.py             # modelo ENIGH 2024 -> gasto estimado por hogar y AGEB (mercado potencial)
   geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
   index.html, styles.css
@@ -109,7 +120,12 @@ web/
   poi.js                     # puntos de interés (superpuesta, con checkboxes por categoría)
   charts-theme.js            # tema común de las gráficas y su exportación a 300 DPI para el PDF
   reporte.js                 # reporte PDF (jsPDF + html2canvas)
-  isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS)
+  isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS) + mercado alcanzable
+  competencia.js             # bloque "Competencia" (DENUE por giro) que montan radio, isócronas y polígono
+  competencia-core.js        # núcleo de competencia: búsqueda de giros, saturación, tamaños (puro, probado en tests/)
+  gasto.js                   # bloque "Mercado potencial" (gasto de los hogares en pesos) de los tres análisis
+  mispuntos.js               # "Mis puntos": archivo del usuario (CSV/Excel/GeoJSON) en el mapa y en los análisis
+  mispuntos-core.js          # lectura del archivo: CSV con comillas, columnas lat/lon, descartes con motivo (puro)
   config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
 proxy/
   server.js                  # proxy de OpenRouteService: guarda la clave fuera del navegador
@@ -118,6 +134,8 @@ tests/
   buffer.test.js             # tests del buffer: ponderación areal, límite municipal, cobertura
   shapefile.test.js          # tests del export a shapefile: proyección UTM 13N, cajas, capas
   proxy.test.js              # tests del proxy: sobre todo lo que DEBE rechazar
+  competencia.test.js        # tests de competencia: búsqueda de giros, tamaños, saturación, DENUE real
+  mispuntos.test.js          # tests de lectura de archivos: Excel en español, comillas, coordenadas invertidas
 ```
 
 ## Análisis de zona de influencia (botón "Radio")
@@ -150,6 +168,119 @@ navegador con el mismo turf.js del CDN. Los tests (`npm install && npm test`,
 solo devDependencies) cubren la ponderación areal, un buffer que cruza el
 límite municipal Aguascalientes/Jesús María y el % de cobertura sin AGEB.
 
+## Geomarketing: mercado alcanzable y competencia
+
+**Mercado alcanzable (isócronas).** Cada banda de tiempo (p. ej. 5/10/15 min
+en auto) calcula población, viviendas habitadas y viviendas por segmento NSE
+— alto (A/B, C+), medio (C, C-), bajo (D+, D, E) — con **la misma
+interpolación areal que el radio** (`agebsEnPoligono()` en `web/buffer.js`,
+`resumenMercado()` en `web/buffer-core.js`). Los conteos son acumulados: la
+banda de 10 min incluye a la de 5. Los segmentos se agrupan en tres bloques a
+propósito: el NSE es un proxy por AGEB y no da para presumir precisión nivel
+por nivel. Si más del 25% de la banda exterior no tiene AGEB 2020, el panel y
+el PDF advierten que la población está subestimada.
+
+**Competencia (radio, isócronas y polígono).** Cada panel de análisis trae un
+bloque "Competencia" donde se eligen hasta 5 giros del DENUE (búsqueda por
+nombre SCIAN, con sinónimos de uso común: "gimnasio" → centros de
+acondicionamiento físico, "estética" → salones de belleza, etc.). Por área
+calcula:
+
+- **Competidores** dentro del área (por banda en las isócronas).
+- **Habitantes por negocio** — población estimada del área ÷ competidores.
+  Más alto = menos saturado. Es orientativo: cruza DENUE (corte reciente)
+  con población del Censo 2020.
+- **Más cercano** al sitio y lista ordenada por distancia (en línea recta, no
+  por calle). En el polígono libre no hay "sitio", así que no hay distancias.
+- **Por tamaño** (personal ocupado según DENUE): micro ≤10, pequeño 11–50,
+  mediano o grande 51+ — separa a la tiendita de la cadena.
+
+- **Mercado por competidor** — el gasto anual de los hogares del área en
+  el rubro que atiende el giro, entre los competidores, y cuánto le tocaría
+  a cada uno si entra uno más (reparto parejo entre n + 1). El rubro se
+  asigna solo (`rubroDeGiro()` en `web/competencia-core.js`: farmacias →
+  medicamentos, gasolineras → combustible, estéticas → cuidados
+  personales, escuelas → educación…) y se puede cambiar en el bloque
+  (`&rubro=` en el permalink). Mayoreo, industria, talleres y giros sin
+  rubro claro de los hogares se quedan sin asignar a propósito: el único
+  rubro que contiene a un taller ("transporte") incluye compra de autos y
+  telefonía e inflaría su mercado. Para esto `build_gasto.py` modela
+  también subcategorías (medicamentos, consultas, hospital, vestido,
+  calzado, combustible, comunicaciones, educación, esparcimiento, cuidados
+  personales). Ojo: en salud el modelo casi no distingue zonas (R² por UPM
+  < 0.1) — el mercado de una farmacia depende sobre todo de cuántos hogares
+  hay, y el panel lo dice. Es gasto de los hogares, no ventas: parte se
+  compra fuera del área y otros formatos (supermercados) también lo
+  capturan.
+
+Los competidores se pintan en magenta en el mapa a cualquier zoom, los giros
+viajan en el permalink (`&giro=Nombre|Nombre`, por nombre y no por índice
+para sobrevivir a una regeneración del DENUE) y la sección entra en los tres
+reportes PDF. El giro elegido se conserva al cambiar de radio a isócrona o a
+polígono, para comparar sitios con el mismo criterio.
+
+**Mercado potencial en pesos (radio, isócronas, polígono y capa "Gasto").**
+Cuánto gastan al año los hogares del área, en total y por categoría —
+alimentos para el hogar, alimentos fuera (restaurantes), vestido y calzado,
+vivienda, limpieza, salud, transporte, educación y esparcimiento, cuidado
+personal — en pesos de 2024. La capa "Gasto" pinta el gasto mensual por
+hogar de cada AGEB.
+
+`scripts/build_gasto.py` genera `data/ags_gasto_ageb.json`:
+
+1. **Modelo lineal por categoría** con los ~1,800 hogares urbanos de
+   Aguascalientes de la ENIGH 2024 (microdatos, ponderados por factor de
+   expansión). Variables: años de escolaridad del jefe, internet,
+   computadora, automóvil, servicios completos, ocupantes por cuarto e
+   integrantes del hogar — las mismas que el Censo 2020 publica por AGEB
+   (como % o promedio). Por ser lineal, aplicarlo a los promedios de un AGEB
+   da exactamente el promedio del modelo sobre sus hogares: no hay sesgo de
+   agregación.
+2. **Calibración**: el Censo decide *dónde* está el gasto y la ENIGH
+   *cuánto*. Cada categoría se escala para que el promedio por hogar de las
+   AGEBs iguale el de la ENIGH en los hogares urbanos de Aguascalientes y
+   Jesús María (factores entre 0.97 y 1.06: ambas fuentes cuadran).
+3. En la app, `mercadoPotencial()` (`web/buffer-core.js`) suma viviendas ×
+   fracción de área × hogares por vivienda (1.01, ENIGH) × gasto × 4
+   trimestres. Las 7 AGEBs sin estimación (datos confidenciales) se reportan
+   como falta de cobertura, no se imputan.
+
+**Qué tan confiable es.** R² del gasto total: 0.26 por hogar (validación
+cruzada) y 0.39 por UPM, los conglomerados de viviendas vecinas de la ENIGH
+(lo más parecido a un AGEB que se puede validar). Un AGEB promedia cientos
+de hogares, así que el error por área es menor que el de una UPM de 5-6
+hogares, pero no se puede medir directamente. Salud tiene R² por UPM < 0.1
+(el gasto en salud es muy irregular): la app la marca "orientativo".
+**Limitación conocida:** el modelo lineal comprime los extremos — las
+variables del Censo se saturan en zonas altas (casi todos tienen auto e
+internet), así que en AGEBs A/B el gasto probablemente se **subestima** y en
+las más bajas se sobreestima. Sirve para dimensionar mercados y comparar
+zonas, no como venta esperada.
+
+Regenerar: descargar a `data/raw/enigh/` los ZIP `concentradohogar`,
+`hogares` y `viviendas` (CSV) de los
+[microdatos ENIGH 2024](https://www.inegi.org.mx/programas/enigh/nc/2024/#microdatos),
+descomprimir cada uno en su carpeta y correr
+`.venv/bin/python scripts/build_gasto.py` (imprime R² y calibración por
+categoría). Con la ENIGH 2026 basta cambiar las rutas.
+
+**Mis puntos (datos del cliente).** Botón "Mis puntos" en la barra de capas:
+carga un CSV, Excel (.xlsx) o GeoJSON con sucursales, clientes o sitios
+candidatos. Requiere columnas de coordenadas (`lat`/`lon`, `latitud`/
+`longitud` o `X`/`Y`); `nombre` y `tipo` son opcionales (`tipo` colorea hasta 6
+grupos). Acepta el CSV que guarda Excel en español (punto y coma, coma
+decimal, Windows-1252); corrige latitud/longitud invertidas y descarta — con
+el renglón y el motivo — lo que no tiene coordenadas válidas en México, en
+vez de adivinar. No hay geocodificación de direcciones: Nominatim solo
+permite 1 petición por segundo y no está pensado para listas.
+
+Con un archivo cargado, el bloque de competencia de cada análisis cuenta
+cuántos de esos puntos caen en el área (por banda en las isócronas), por
+tipo y los más cercanos al sitio, y lo lleva al PDF. **El archivo se lee en
+el navegador y nunca se envía a ningún servidor ni se guarda**; al recargar
+se pierde y no viaja en el permalink. Excel se lee con SheetJS, que se
+descarga de cdnjs solo al abrir un .xlsx.
+
 ## Fuentes de datos
 
 | Dato | Fuente | Archivo |
@@ -165,6 +296,7 @@ límite municipal Aguascalientes/Jesús María y el % de cobertura sin AGEB.
 | Recámaras / cuartos | Censo 2020 (mismo ITER de arriba): `VPH_2YMASD`, `VPH_3YMASC` | mismo CSV |
 | Marginación urbana | CONAPO, Índice de Marginación Urbana 2020 | `data/raw/conapo/IMU_2020.xls` |
 | Proyección de población | CONAPO, Proyecciones de Población de los Municipios de México 1990-2040 | `data/raw/conapo/pobproy_ggrupos.csv` |
+| Gasto de los hogares | INEGI, ENIGH 2024 — microdatos `concentradohogar`, `hogares`, `viviendas` ([descarga](https://www.inegi.org.mx/programas/enigh/nc/2024/#microdatos)) | `data/raw/enigh/` → `scripts/build_gasto.py` |
 | Puntos de interés | OpenStreetMap contributors, vía [Overpass API](https://overpass-api.de/api/interpreter) (dato abierto ODbL) | generado por `scripts/build_poi.py`, no se guarda insumo crudo |
 
 URLs de descarga directa usadas:

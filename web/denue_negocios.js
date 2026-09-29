@@ -149,4 +149,5 @@ btnDenueNeg.addEventListener("click", () => {
 
 map.on("zoomend moveend", refrescarDenueNeg);
 
-loadDenueNegocios();
+// competencia.js espera a esta promesa si el usuario analiza antes de que termine la descarga
+window.denueNegListo = loadDenueNegocios();

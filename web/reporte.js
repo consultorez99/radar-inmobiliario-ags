@@ -232,7 +232,7 @@ async function generarReportePDF() {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(40, 40, 40);
       const pobTxt = Object.entries(s.poblacionMunicipios.municipios)
-        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+        .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020 a ${v.anioComparacionFin})`)
         .join(" · ");
       doc.text(pobTxt, MARGIN, y + 4.5, { maxWidth: CONTENT_W });
       y += 10;
@@ -280,6 +280,16 @@ async function generarReportePDF() {
       doc.text(fmtMXN(c.valor_m2), MARGIN + CONTENT_W - 2, y, { align: "right" });
     }
 
+    // mercado potencial y competencia: página propia (las dos anteriores ya van llenas)
+    const hayGasto = !!s.gasto?.hogares && window.GastoUI?.disponible();
+    const hayComp = !!(window.Competencia?.resultado() || window.Competencia?.propios());
+    if (hayGasto || hayComp) {
+      const nueva = () => { doc.addPage(); pdfHeader(doc, "Mercado y competencia en la zona"); return 30; };
+      let yz = nueva();
+      yz = seccionGastoPDF(doc, yz, nueva, [{ label: "la zona", mp: s.gasto }]);
+      seccionCompetenciaPDF(doc, yz, nueva);
+    }
+
     const pages = doc.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i);
@@ -291,6 +301,210 @@ async function generarReportePDF() {
   } finally {
     btn.disabled = false;
     btn.textContent = "Generar reporte PDF";
+  }
+}
+
+/* Sección "Mercado potencial" (gasto.js) para los tres reportes: gasto anual
+ * de los hogares del área por categoría, en millones de pesos de 2024.
+ *   bandas: [{ label, mp }] (una sola en radio y polígono)
+ * Devuelve la y final; si el gasto no cargó, no escribe nada. */
+function seccionGastoPDF(doc, y, salto, bandas) {
+  if (!window.GastoUI?.disponible() || !bandas.length || !bandas[bandas.length - 1].mp?.hogares) return y;
+  const need = (mm) => { if (y + mm > 272) y = salto(); };
+  const mill = (x) => (x == null ? "—" : Math.round(x / 1e6).toLocaleString("es-MX"));
+  const cats = window.GastoUI.categorias();
+  const ext = bandas[bandas.length - 1].mp;
+  const x0 = MARGIN + 110, paso = bandas.length > 1 ? 25 : 30;
+
+  need(22 + cats.length * 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 40, 40);
+  doc.text("Mercado potencial: gasto anual de los hogares (millones de pesos de 2024)", MARGIN, y);
+  y += 6;
+  doc.setFontSize(8.5);
+  doc.setFillColor(224, 236, 244);
+  doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+  doc.text("Categoría", MARGIN + 2, y);
+  bandas.forEach((b, i) => doc.text(b.label.replace("≤", "hasta "), x0 + i * paso, y, { align: "right" }));
+  if (bandas.length === 1) doc.text("% del total", x0 + paso, y, { align: "right" });
+  const fila = (label, fn, negrita = false) => {
+    y += 5;
+    doc.setFont("helvetica", negrita ? "bold" : "normal");
+    doc.text(label, MARGIN + 2, y);
+    bandas.forEach((b, i) => doc.text(fn(b.mp), x0 + i * paso, y, { align: "right" }));
+  };
+  fila("Total", (mp) => mill(mp.anual.total), true);
+  if (bandas.length === 1) doc.text("100%", x0 + paso, y, { align: "right" });
+  for (const c of cats) {
+    fila(c.etiqueta + (c.baja ? " (orientativo)" : ""), (mp) => mill(mp.anual[c.clave]));
+    if (bandas.length === 1 && ext.anual.total) {
+      doc.text(`${Math.round((ext.anual[c.clave] / ext.anual.total) * 100)}%`, x0 + paso, y, { align: "right" });
+    }
+  }
+  fila("Gasto por hogar al mes (pesos)", (mp) => fmtMXN(Math.round((mp.gastoAnualPorHogar || 0) / 12)));
+  fila("Hogares", (mp) => Math.round(mp.hogares).toLocaleString("es-MX"));
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(110, 100, 130);
+  const cobertura = ext.coberturaPct != null && ext.coberturaPct < 95
+    ? ` El ${Math.round(100 - ext.coberturaPct)}% de las viviendas del área está en AGEBs sin estimación (datos confidenciales del Censo) y no se cuenta.`
+    : "";
+  const nota = doc.splitTextToSize(
+    "Estimación propia: modelo lineal por categoría ajustado con los microdatos de la ENIGH 2024 (hogares urbanos de " +
+    "Aguascalientes) sobre variables que el Censo 2020 publica por AGEB (escolaridad, internet, computadora, auto, " +
+    "servicios, ocupantes por cuarto y tamaño del hogar), calibrado al gasto promedio ENIGH y sumado con interpolación " +
+    "areal. Dimensiona el mercado y compara zonas; no es venta esperada. En zonas A/B probablemente se subestima." + cobertura,
+    CONTENT_W - 4);
+  need(nota.length * 3.7 + 2);
+  doc.text(nota, MARGIN + 2, y);
+  y += nota.length * 3.7 + 6;
+  doc.setTextColor(40, 40, 40);
+  return y;
+}
+
+/* Sección "Competencia" (competencia.js) para los tres reportes: radio,
+ * isócronas y polígono. Lee el último cálculo del bloque del panel, así que
+ * el PDF dice exactamente lo que se vio en pantalla. Si no se eligió ningún
+ * giro, no escribe nada.
+ *   y:     posición actual
+ *   salto: agrega una página con encabezado y devuelve la y inicial
+ * Devuelve la y final. */
+function seccionCompetenciaPDF(doc, y, salto) {
+  const res = window.Competencia?.resultado();
+  const prop = window.Competencia?.propios();
+  if (!res && !prop) return y;
+  const need = (mm) => { if (y + mm > 272) y = salto(); };
+  const fmt = (n) => (n == null ? "—" : Math.round(n).toLocaleString("es-MX"));
+  // Solo caracteres WinAnsi en todo lo que va al PDF: las fuentes base de
+  // jsPDF no traen "≤" ni "→", y uno solo de ellos descompone el renglón entero.
+  const km = (d) => (d < 1 ? `${Math.round(d * 1000)} m` : `${d.toFixed(1)} km`);
+  const linea = (txt, size = 9, extra = 1.2) => {
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(txt, CONTENT_W - 4);
+    need(lines.length * size * 0.46 + extra);
+    doc.setFontSize(size);
+    doc.text(lines, MARGIN + 2, y);
+    y += lines.length * size * 0.46 + extra;
+  };
+  if (!res) return seccionPropiosPDF();
+  const ext = res.bandas[res.bandas.length - 1];
+
+  need(40);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 40, 40);
+  doc.text("Competencia (DENUE, INEGI)", MARGIN, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  linea(`Giros analizados: ${res.giros.join("; ")}.`, 8.5);
+
+  if (res.bandas.length > 1) {
+    y += 3;
+    doc.setFontSize(8.5);
+    doc.setFillColor(250, 232, 255);
+    doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.text("Indicador", MARGIN + 2, y);
+    // "≤" no existe en las fuentes base de jsPDF y descompone el renglón entero
+    res.bandas.forEach((b, i) => doc.text(b.label.replace("≤", "hasta "), MARGIN + 100 + i * 30, y, { align: "right" }));
+    doc.setFont("helvetica", "normal");
+    for (const [label, fn] of [["Competidores", (b) => String(b.n)], ["Habitantes por negocio", (b) => fmt(b.habPorNegocio)]]) {
+      y += 5.5;
+      doc.text(label, MARGIN + 2, y);
+      res.bandas.forEach((b, i) => doc.text(fn(b), MARGIN + 100 + i * 30, y, { align: "right" }));
+    }
+    y += 6;
+  } else {
+    linea(`Competidores en ${ext.label}: ${ext.n}   ·   Habitantes por negocio: ${fmt(ext.habPorNegocio)}`, 9.5);
+  }
+  // mercado por competidor: gasto anual del rubro que atiende el giro
+  if (res.rubro?.clave) {
+    const dinero = (x) => (x == null ? "—" : x >= 1e6
+      ? `$${(x / 1e6).toLocaleString("es-MX", { maximumFractionDigits: x >= 1e8 ? 0 : 1 })} M`
+      : fmtMXN(Math.round(x / 1000) * 1000));
+    linea(`Mercado por competidor — rubro de gasto: ${res.rubro.etiqueta}` +
+      `${res.rubro.manual ? " (elegido a mano)" : " (según el giro)"}.`, 9);
+    if (res.bandas.length > 1) {
+      for (const b of res.bandas) {
+        linea(`${b.label.replace("≤", "hasta ")}: gasto ${dinero(b.gastoRubro)} al año · ` +
+          `${b.n ? `${dinero(b.porCompetidor)} por competidor` : "sin competidores"} · ` +
+          `si entra uno más, ${dinero(b.siEntraUnoMas)} cada uno.`, 8.5, 0.9);
+      }
+    } else {
+      linea(`Gasto de los hogares en el rubro: ${dinero(ext.gastoRubro)} al año · ` +
+        `${ext.n ? `por competidor: ${dinero(ext.porCompetidor)}` : "sin competidores: mercado sin atender"} · ` +
+        `si entra uno más: ${dinero(ext.siEntraUnoMas)} para cada uno (reparto parejo).`, 9);
+    }
+    doc.setTextColor(110, 100, 130);
+    linea("Es gasto estimado de los hogares del área (ENIGH 2024), no ventas: parte se compra fuera del área y " +
+      "otros tipos de negocio también lo capturan." +
+      (res.rubro.baja ? " En este rubro el gasto casi no varía entre zonas: el mercado depende sobre todo del número de hogares." : ""),
+      8, 1.4);
+    doc.setTextColor(40, 40, 40);
+  }
+  if (ext.masCercano) {
+    linea(`Más cercano al sitio: ${ext.masCercano.nombre}, a ${km(ext.masCercano.distKm)} en línea recta.`);
+  }
+  if (ext.n) {
+    const t = ext.porTamano;
+    linea(`Por tamaño: micro (hasta 10 personas) ${t.micro} · pequeño (11–50) ${t.pequeno} · mediano o grande (51+) ${t.grande}.`);
+  }
+
+  const maxLista = 15;
+  if (ext.n) {
+    y += 2;
+    need(12);
+    doc.setFontSize(8.5);
+    doc.setFillColor(250, 232, 255);
+    doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.text("Negocio", MARGIN + 2, y);
+    doc.text("Tamaño", MARGIN + 110, y);
+    if (res.centro) doc.text("Distancia", MARGIN + CONTENT_W - 2, y, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    for (const c of ext.lista.slice(0, maxLista)) {
+      y += 5;
+      need(5);
+      doc.setFontSize(8.5);
+      doc.text(c.nombre.length > 60 ? c.nombre.slice(0, 58) + "…" : c.nombre, MARGIN + 2, y);
+      doc.text(c.tamano || "", MARGIN + 110, y);
+      if (c.distKm != null) doc.text(km(c.distKm), MARGIN + CONTENT_W - 2, y, { align: "right" });
+    }
+    y += 5;
+    if (ext.n > maxLista) linea(`… y ${ext.n - maxLista} negocios más.`, 8.5);
+  }
+  doc.setTextColor(110, 100, 130);
+  linea(`DENUE corte ${res.corte} contra población del Censo 2020: la saturación (habitantes por negocio) es orientativa. ` +
+    "Distancias en línea recta, no por calle. El DENUE registra establecimientos, no ventas ni afluencia.", 8, 1.6);
+  doc.setTextColor(40, 40, 40);
+  y += 4;
+  return prop ? seccionPropiosPDF() : y;
+
+  // Puntos del archivo del usuario (Mis puntos): conteo por banda, por grupo
+  // y los más cercanos. Comparte `y`, `need` y `linea` con la sección de arriba.
+  function seccionPropiosPDF() {
+    const pe = prop.bandas[prop.bandas.length - 1];
+    need(24);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text("Puntos propios (archivo del usuario)", MARGIN, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    linea(`Archivo: ${prop.archivo}.`, 8.5);
+    linea(prop.bandas.map((b) => `${b.label.replace("≤", "hasta ")}: ${b.n}`).join("   ·   "), 9.5);
+    const grupos = Object.entries(prop.porGrupo);
+    if (pe.n && (grupos.length > 1 || !prop.porGrupo["Sin grupo"])) {
+      linea("Por tipo: " + grupos.map(([g, n]) => `${g} ${n}`).join(" · ") + ".");
+    }
+    for (const c of pe.lista.slice(0, 10)) {
+      linea(`· ${c.nombre}${c.distKm != null ? ` — ${km(c.distKm)}` : ""}`, 8.5, 0.8);
+    }
+    if (pe.n > 10) linea(`… y ${pe.n - 10} más.`, 8.5);
+    return y + 4;
   }
 }
 
@@ -573,6 +787,9 @@ async function generarReporteBufferPDF() {
     }
     y += 6;
 
+    y = seccionGastoPDF(doc, y, () => { salto(); return y; }, [{ label: `${s.radiusKm} km`, mp: s.gasto }]);
+    y = seccionCompetenciaPDF(doc, y, () => { salto(); return y; });
+
     need(14);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -595,7 +812,7 @@ async function generarReporteBufferPDF() {
     parrafo(
       s.poblacionMunicipios
         ? Object.entries(s.poblacionMunicipios.municipios)
-            .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020→${v.anioComparacionFin})`)
+            .map(([m, v]) => `${m}: ${v.cambio2020FinPct >= 0 ? "+" : ""}${v.cambio2020FinPct}% (2020 a ${v.anioComparacionFin})`)
             .join("   ·   ") +
           "  (dato del municipio completo, no específico del radio — ver gráfica)"
         : "s/d",
@@ -709,6 +926,55 @@ async function generarReporteIsocronasPDF() {
     y = await capturaMapaPDF(doc, y);
     y += 9;
 
+    // ---------------- mercado alcanzable (Censo 2020) ----------------
+    if (s.mercado) {
+      const m = s.mercado;
+      const pct = (n) => (n == null ? "" : ` (${Math.round(n)}%)`);
+      const filasMerc = [
+        ["Población", (b) => fmt(b.pop)],
+        ["Viviendas habitadas", (b) => fmt(b.viviendas)],
+        ["Viviendas NSE alto (A/B, C+)", (b) => fmt(b.segmentos.viv.alto) + pct(b.segmentos.pct.alto)],
+        ["Viviendas NSE medio (C, C-)", (b) => fmt(b.segmentos.viv.medio) + pct(b.segmentos.pct.medio)],
+        ["Viviendas NSE bajo (D+, D, E)", (b) => fmt(b.segmentos.viv.bajo) + pct(b.segmentos.pct.bajo)],
+        ["NSE predominante", (b) => b.nivelPred || "—"],
+        ["Con automóvil", (b) => (b.pctAuto == null ? "s/d" : `${Math.round(b.pctAuto)}%`)],
+      ];
+      need(14 + filasMerc.length * 5.5);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text("Mercado alcanzable (Censo 2020, conteo acumulado)", MARGIN, y);
+      y += 5;
+      doc.setFontSize(8.5);
+      doc.setFillColor(232, 240, 246);
+      doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+      doc.text("Indicador", MARGIN + 2, y);
+      mins.forEach((mm, i) => doc.text(`hasta ${mm} min`, MARGIN + 100 + i * 30, y, { align: "right" }));
+      doc.setFont("helvetica", "normal");
+      for (const [label, fn] of filasMerc) {
+        y += 5.5;
+        doc.text(label, MARGIN + 2, y);
+        m.forEach((b, i) => doc.text(fn(b), MARGIN + 100 + i * 30, y, { align: "right" }));
+      }
+      y += 6;
+      const ext = m[m.length - 1];
+      if (ext.pctSinAgeb != null && ext.pctSinAgeb > 25) {
+        doc.setTextColor(160, 80, 20);
+        parrafo(`El ${Math.round(ext.pctSinAgeb)}% del área de ${maxMin} min no tiene AGEB urbana 2020 ` +
+          "(fraccionamientos nuevos o zona rural): la población alcanzable está subestimada.", MARGIN, 8, 1.2);
+        doc.setTextColor(40, 40, 40);
+      }
+      y += 5;
+    }
+
+    // ---------------- mercado potencial en pesos ----------------
+    if (s.mercado) {
+      y = seccionGastoPDF(doc, y, () => { salto(); return y; },
+        s.mercado.map((b, i) => ({ label: `${mins[i]} min`, mp: b.gasto })));
+    }
+
+    // ---------------- competencia (si se eligió un giro) ----------------
+    y = seccionCompetenciaPDF(doc, y, () => { salto(); return y; });
+
     // ---------------- servicios alcanzables (POIs) ----------------
     const r = s.reach;
     need(20);
@@ -727,7 +993,7 @@ async function generarReporteIsocronasPDF() {
       doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
       doc.setFont("helvetica", "bold");
       doc.text("Categoría", MARGIN + 2, y);
-      mins.forEach((m, i) => doc.text(`≤ ${m} min`, MARGIN + 75 + i * 35, y, { align: "right" }));
+      mins.forEach((m, i) => doc.text(`hasta ${m} min`, MARGIN + 75 + i * 35, y, { align: "right" }));
       doc.setFont("helvetica", "normal");
       for (const [cat, conteos] of filas) {
         y += 5.5;
@@ -780,6 +1046,7 @@ async function generarReporteIsocronasPDF() {
         : "Modo A pie: contorno calculado con OpenRouteService sobre la red vial de OpenStreetMap, a velocidad de caminata.",
       "Cada banda es el área alcanzable en N minutos o menos desde el punto, puerta a puerta. El contorno se suaviza para su presentación, sin alterar el alcance calculado.",
       "Los tiempos son estimaciones sin tráfico en vivo: sirven para comparar la conectividad entre zonas, no como hora de llegada de un viaje concreto.",
+      "Mercado alcanzable: Censo 2020 (INEGI, AGEB urbana) por interpolación areal — cada AGEB aporta la fracción de su área dentro de la banda, asumiendo distribución uniforme. Segmentos con el NSE estimado propio (no la regla AMAI). Es una estimación, no un conteo.",
       "Puntos de interés: OpenStreetMap (ODbL). Proyectos de vivienda nueva: estudio de mercado de terceros, corte 1T26.",
       "Este reporte NO es un avalúo.",
     ];

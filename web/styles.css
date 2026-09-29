@@ -934,6 +934,129 @@ body.iso-picking #map * {
   width: 42px;
 }
 
+/* tabla de mercado alcanzable: cifras más anchas (miles + % al lado) */
+.iso-mercado th:not(:first-child),
+.iso-mercado td:not(:first-child) {
+  width: auto;
+  white-space: nowrap;
+}
+.iso-mercado td:first-child { line-height: 1.25; white-space: nowrap; }
+.iso-mercado td { vertical-align: top; }
+.iso-mercado-wrap { max-height: none; }
+.iso-sub {
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0 0 6px;
+}
+.iso-mercado .iso-sub { margin: 0 0 0 12px; }
+
+/* ---------- Competencia (bloque dentro de radio / isócronas / polígono) ---------- */
+.comp-slot { margin-top: 4px; }
+
+.comp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 6px;
+}
+
+.comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: #fae8ff;
+  color: #86198f;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.comp-chip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.comp-chip-x {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.comp-chip-x:hover { background: #f5d0fe; }
+
+.comp-buscar { position: relative; margin-bottom: 6px; }
+
+.comp-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+}
+.comp-input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+.comp-sugerencias {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.comp-sug {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.comp-sug:hover { background: var(--surface-hover); }
+
+.comp-sug-vacio { padding: 8px; font-size: 11px; color: var(--muted); }
+
+.comp-linea { font-size: 11.5px; margin: 4px 0; }
+
+.comp-lista { margin: 4px 0 6px; font-size: 11.5px; }
+
+/* ---------- Mis puntos (archivo del usuario) ---------- */
+.mp-estado { color: var(--text-dark); }
+.mp-estado .legend-rows { margin-top: 4px; }
+.mp-error { color: #b45309; font-weight: 600; }
+
+.mp-botones { display: flex; gap: 6px; margin: 8px 0 4px; }
+
+.mp-btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mp-btn:hover { filter: brightness(1.1); }
+.mp-btn-sec { background: var(--surface); color: var(--ink); }
+
 .iso-loading {
   margin-top: 8px;
   font-size: 12px;
@@ -1188,3 +1311,23 @@ body.iso-picking #map * {
   .modal { padding: 16px; max-height: 90vh; }
   .modal-wide { max-width: none; }
 }
+
+/* tabla de mercado potencial: las categorías son largas, pueden partirse */
+.gasto-tabla td:first-child { white-space: normal; min-width: 96px; }
+
+/* mercado por competidor dentro del bloque de competencia */
+.comp-mercado { margin: 6px 0 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.comp-rubro-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.comp-rubro {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--text-dark);
+  background: var(--panel-bg);
+}
+.comp-mercado .iso-mercado td:first-child { white-space: normal; }
