@@ -87,6 +87,7 @@ function analyzeBuffer(lat, lng, radiusKm) {
   // AGEBs: intersección con fracción de área (interpolación areal)
   const { rows: agebRows, areaKm2: agebAreaKm2 } = agebsEnPoligono(circle);
   const demo = BufferCore.aggregateDemographics(agebRows);
+  const gasto = window.GastoUI?.calcular(agebRows) || null;
   const pctSinAgeb = BufferCore.coverageSinAgeb(agebAreaKm2, areaKm2);
 
   // Proyección de población (CONAPO 1990-2040): dato de contexto a nivel
@@ -146,7 +147,7 @@ function analyzeBuffer(lat, lng, radiusKm) {
 
   const stats = {
     lat, lng, radiusKm, areaKm2, agebRows, agebAreaKm2, pctSinAgeb,
-    demo, poblacionMunicipios, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
+    demo, gasto, poblacionMunicipios, colonias, catStats, pdu, pduAreaKm2, proyectos, pois, poisDisponibles,
   };
   bufferCache.set(key, stats);
   if (bufferCache.size > 30) bufferCache.delete(bufferCache.keys().next().value);
@@ -409,6 +410,7 @@ function bufferResultsHTML(s) {
       <span>3+ cuartos <strong>${bfPct(d.pct3cuart)}</strong></span>
     </div>
     <div class="zone-list"><strong>NSE (% de población):</strong><br>${nseRows || "s/d"}</div>
+    ${window.GastoUI?.html([{ label: `${s.radiusKm} km`, mp: s.gasto }]) || ""}
     <div class="comp-slot"></div>
     <div class="zone-list"><strong>Valor catastral suelo 2026</strong>
       ${s.catStats ? `· ${s.catStats.n} colonias · min ${fmtMXN(s.catStats.min)} ·

@@ -263,6 +263,7 @@ function analyzeMercado(polys) {
   for (let i = polys.length - 1; i >= 0; i--) {
     const { rows, areaKm2 } = agebsEnPoligono(polys[i], candidatas);
     out[i] = BufferCore.resumenMercado(rows, turf.area(polys[i]) / 1e6, areaKm2);
+    out[i].gasto = window.GastoUI?.calcular(rows) || null;
     candidatas = rows.map((r) => r.feature);
   }
   return out;
@@ -554,6 +555,8 @@ function isoResultsHTML(s) {
   return `
     <div class="zone-cards iso-cards">${cards}</div>
     ${mercadoBlock}
+    ${s.mercado ? window.GastoUI?.html(s.mercado.map((b, i) => ({
+        label: `≤${s.minutes[i]}${i === s.minutes.length - 1 ? " min" : ""}`, mp: b.gasto }))) || "" : ""}
     <div class="comp-slot"></div>
     ${poiBlock}
     ${proyBlock}

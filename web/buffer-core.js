@@ -169,6 +169,35 @@
     };
   }
 
+  /* Mercado potencial de un área: gasto ANUAL de sus hogares por categoría,
+   * en pesos de 2024. Cada AGEB trae en props.gasto su gasto trimestral por
+   * hogar estimado (scripts/build_gasto.py: ENIGH 2024 + Censo 2020); aquí se
+   * multiplica por sus viviendas dentro del área (misma interpolación areal
+   * que la población), por hogares por vivienda y por 4 trimestres.
+   * Las AGEBs sin estimación (datos confidenciales en el Censo) no se
+   * inventan: se reportan como falta de cobertura. */
+  function mercadoPotencial(rows, hogaresPorVivienda = 1) {
+    const anual = {};
+    let vivCon = 0, vivTot = 0;
+    for (const r of rows) {
+      const viv = (r.props.TVIVPARHAB || 0) * r.frac;
+      vivTot += viv;
+      const g = r.props.gasto;
+      if (!g) continue;
+      vivCon += viv;
+      for (const [cat, trim] of Object.entries(g)) {
+        anual[cat] = (anual[cat] || 0) + viv * hogaresPorVivienda * trim * 4;
+      }
+    }
+    const hogares = vivCon * hogaresPorVivienda;
+    return {
+      anual,
+      hogares,
+      gastoAnualPorHogar: hogares > 0 && anual.total != null ? anual.total / hogares : null,
+      coberturaPct: vivTot > 0 ? (vivCon / vivTot) * 100 : null,
+    };
+  }
+
   /* min / mediana / max / n de una lista de valores catastrales ($/m²). */
   function catastralStats(valores) {
     const v = valores.filter((x) => x != null).sort((a, b) => a - b);
@@ -700,7 +729,7 @@
 
   return {
     aggregateDemographics, coverageSinAgeb, catastralStats, weightedMean,
-    NSE_SEGMENTOS, resumenMercado,
+    NSE_SEGMENTOS, resumenMercado, mercadoPotencial,
     CORTES_EDAD_NOTA, NOTA_METODO_BUFFER, NSE_NIVELES_ORDEN,
     buildZonaAgregados, buildZonaEstudioJSON, ZONA_ESTUDIO_SCHEMA_VERSION,
     csvEscape, bufferCSVRows,

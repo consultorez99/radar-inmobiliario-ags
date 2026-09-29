@@ -280,10 +280,14 @@ async function generarReportePDF() {
       doc.text(fmtMXN(c.valor_m2), MARGIN + CONTENT_W - 2, y, { align: "right" });
     }
 
-    // competencia: página propia (las dos anteriores ya van llenas)
-    if (window.Competencia?.resultado()) {
-      const nueva = () => { doc.addPage(); pdfHeader(doc, "Competencia en la zona"); return 30; };
-      seccionCompetenciaPDF(doc, nueva(), nueva);
+    // mercado potencial y competencia: página propia (las dos anteriores ya van llenas)
+    const hayGasto = !!s.gasto?.hogares && window.GastoUI?.disponible();
+    const hayComp = !!(window.Competencia?.resultado() || window.Competencia?.propios());
+    if (hayGasto || hayComp) {
+      const nueva = () => { doc.addPage(); pdfHeader(doc, "Mercado y competencia en la zona"); return 30; };
+      let yz = nueva();
+      yz = seccionGastoPDF(doc, yz, nueva, [{ label: "la zona", mp: s.gasto }]);
+      seccionCompetenciaPDF(doc, yz, nueva);
     }
 
     const pages = doc.getNumberOfPages();
@@ -298,6 +302,67 @@ async function generarReportePDF() {
     btn.disabled = false;
     btn.textContent = "Generar reporte PDF";
   }
+}
+
+/* Sección "Mercado potencial" (gasto.js) para los tres reportes: gasto anual
+ * de los hogares del área por categoría, en millones de pesos de 2024.
+ *   bandas: [{ label, mp }] (una sola en radio y polígono)
+ * Devuelve la y final; si el gasto no cargó, no escribe nada. */
+function seccionGastoPDF(doc, y, salto, bandas) {
+  if (!window.GastoUI?.disponible() || !bandas.length || !bandas[bandas.length - 1].mp?.hogares) return y;
+  const need = (mm) => { if (y + mm > 272) y = salto(); };
+  const mill = (x) => (x == null ? "—" : Math.round(x / 1e6).toLocaleString("es-MX"));
+  const cats = window.GastoUI.categorias();
+  const ext = bandas[bandas.length - 1].mp;
+  const x0 = MARGIN + 110, paso = bandas.length > 1 ? 25 : 30;
+
+  need(22 + cats.length * 5);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(40, 40, 40);
+  doc.text("Mercado potencial: gasto anual de los hogares (millones de pesos de 2024)", MARGIN, y);
+  y += 6;
+  doc.setFontSize(8.5);
+  doc.setFillColor(224, 236, 244);
+  doc.rect(MARGIN, y - 4, CONTENT_W, 6, "F");
+  doc.text("Categoría", MARGIN + 2, y);
+  bandas.forEach((b, i) => doc.text(b.label.replace("≤", "hasta "), x0 + i * paso, y, { align: "right" }));
+  if (bandas.length === 1) doc.text("% del total", x0 + paso, y, { align: "right" });
+  const fila = (label, fn, negrita = false) => {
+    y += 5;
+    doc.setFont("helvetica", negrita ? "bold" : "normal");
+    doc.text(label, MARGIN + 2, y);
+    bandas.forEach((b, i) => doc.text(fn(b.mp), x0 + i * paso, y, { align: "right" }));
+  };
+  fila("Total", (mp) => mill(mp.anual.total), true);
+  if (bandas.length === 1) doc.text("100%", x0 + paso, y, { align: "right" });
+  for (const c of cats) {
+    fila(c.etiqueta + (c.baja ? " (orientativo)" : ""), (mp) => mill(mp.anual[c.clave]));
+    if (bandas.length === 1 && ext.anual.total) {
+      doc.text(`${Math.round((ext.anual[c.clave] / ext.anual.total) * 100)}%`, x0 + paso, y, { align: "right" });
+    }
+  }
+  fila("Gasto por hogar al mes (pesos)", (mp) => fmtMXN(Math.round((mp.gastoAnualPorHogar || 0) / 12)));
+  fila("Hogares", (mp) => Math.round(mp.hogares).toLocaleString("es-MX"));
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(110, 100, 130);
+  const cobertura = ext.coberturaPct != null && ext.coberturaPct < 95
+    ? ` El ${Math.round(100 - ext.coberturaPct)}% de las viviendas del área está en AGEBs sin estimación (datos confidenciales del Censo) y no se cuenta.`
+    : "";
+  const nota = doc.splitTextToSize(
+    "Estimación propia: modelo lineal por categoría ajustado con los microdatos de la ENIGH 2024 (hogares urbanos de " +
+    "Aguascalientes) sobre variables que el Censo 2020 publica por AGEB (escolaridad, internet, computadora, auto, " +
+    "servicios, ocupantes por cuarto y tamaño del hogar), calibrado al gasto promedio ENIGH y sumado con interpolación " +
+    "areal. Dimensiona el mercado y compara zonas; no es venta esperada. En zonas A/B probablemente se subestima." + cobertura,
+    CONTENT_W - 4);
+  need(nota.length * 3.7 + 2);
+  doc.text(nota, MARGIN + 2, y);
+  y += nota.length * 3.7 + 6;
+  doc.setTextColor(40, 40, 40);
+  return y;
 }
 
 /* Sección "Competencia" (competencia.js) para los tres reportes: radio,
@@ -697,6 +762,7 @@ async function generarReporteBufferPDF() {
     }
     y += 6;
 
+    y = seccionGastoPDF(doc, y, () => { salto(); return y; }, [{ label: `${s.radiusKm} km`, mp: s.gasto }]);
     y = seccionCompetenciaPDF(doc, y, () => { salto(); return y; });
 
     need(14);
@@ -873,6 +939,12 @@ async function generarReporteIsocronasPDF() {
         doc.setTextColor(40, 40, 40);
       }
       y += 5;
+    }
+
+    // ---------------- mercado potencial en pesos ----------------
+    if (s.mercado) {
+      y = seccionGastoPDF(doc, y, () => { salto(); return y; },
+        s.mercado.map((b, i) => ({ label: `${mins[i]} min`, mp: b.gasto })));
     }
 
     // ---------------- competencia (si se eligió un giro) ----------------

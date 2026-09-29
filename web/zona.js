@@ -142,12 +142,18 @@ function analyzeZone(polygon) {
   // que toca la zona.
   const poblacionMunicipios = resolvePoblacionMunicipios([...new Set(agebs.map((p) => p.municipio))]);
 
+  // Mercado potencial en pesos: por interpolación areal (fracción de cada
+  // AGEB dentro del polígono), igual que radio e isócronas — sumar el AGEB
+  // completo inflaría el dinero de un polígono que solo roza una esquina.
+  const gasto = window.GastoUI?.disponible()
+    ? window.GastoUI.calcular(agebsEnPoligono(polygon).rows) : null;
+
   return {
     areaKm2, nAgebs: agebs.length, pop, nivelPred,
     nseScore: scoreW ? scoreSum / scoreW : null,
     nseCounts, pct2dorm: nPct ? d2 / nPct : null, pct3cuart: nPct ? c3 / nPct : null,
     cols: cols.sort((a, b) => b.valor_m2 - a.valor_m2), catStats,
-    priceZones, pduShares, poblacionMunicipios,
+    priceZones, pduShares, poblacionMunicipios, gasto,
   };
 }
 
@@ -190,6 +196,7 @@ function renderZonePanel(s) {
       <div class="zone-card"><div class="zc-label">Viviendas 3+ cuartos</div>
         <div class="zc-value">${s.pct3cuart != null ? s.pct3cuart.toFixed(0) + "%" : "s/d"}</div></div>
     </div>
+    ${window.GastoUI?.html([{ label: "la zona", mp: s.gasto }]) || ""}
     <div class="comp-slot"></div>
     <div class="zone-list"><strong>Mercado:</strong><br>${priceTxt}</div>
     <div class="zone-list"><strong>Uso de suelo (PDU):</strong> ${pduTxt}</div>

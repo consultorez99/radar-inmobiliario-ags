@@ -92,6 +92,7 @@ data/
   ags_poi.json            # 1,467 puntos de interés (OpenStreetMap/Overpass): educación, salud, abasto, bancos, parques, gasolineras
   ags_denue_proxy.json    # NSE estimado EXPERIMENTAL (Bajo/Medio/Alto) en 20 zonas sin AGEB 2020,
                              # modelo calibrado con DENUE — no es dato censal, ver metodología en README abajo
+  ags_gasto_ageb.json     # gasto trimestral estimado por hogar y categoría, por AGEB (ENIGH 2024 + Censo 2020)
   ags_denue_negocios.json # directorio DENUE completo: 57,931 negocios (Ags + JM), sin modelo,
                              # formato compacto (arrays posicionales, ver meta.esquema en el archivo)
   raw/                       # insumos INEGI, Periódico Oficial y webmaps IMPLAN (no editar)
@@ -103,6 +104,7 @@ scripts/
   build_denue_proxy.py       # calibra el modelo NSE-por-DENUE y genera la capa "Estimado" (ver metodología abajo)
   build_denue_negocios.py    # exporta el directorio DENUE completo (dato crudo) para la capa "Negocios"
   build_shf.py               # parsea el XLSX de datos abiertos del Índice SHF (descarga trimestral manual)
+  build_gasto.py             # modelo ENIGH 2024 -> gasto estimado por hogar y AGEB (mercado potencial)
   geocode_softec_proyectos.py # geocodifica por nombre los proyectos del panel Vivienda nueva
 web/
   index.html, styles.css
@@ -117,6 +119,7 @@ web/
   isocronas.js               # isócronas por tiempo (Auto vía TomTom, A pie vía el proxy de ORS) + mercado alcanzable
   competencia.js             # bloque "Competencia" (DENUE por giro) que montan radio, isócronas y polígono
   competencia-core.js        # núcleo de competencia: búsqueda de giros, saturación, tamaños (puro, probado en tests/)
+  gasto.js                   # bloque "Mercado potencial" (gasto de los hogares en pesos) de los tres análisis
   mispuntos.js               # "Mis puntos": archivo del usuario (CSV/Excel/GeoJSON) en el mapa y en los análisis
   mispuntos-core.js          # lectura del archivo: CSV con comillas, columnas lat/lon, descartes con motivo (puro)
   config.js                  # clave de TomTom (restringida por dominio) y URL del proxy de ORS
@@ -194,6 +197,51 @@ para sobrevivir a una regeneración del DENUE) y la sección entra en los tres
 reportes PDF. El giro elegido se conserva al cambiar de radio a isócrona o a
 polígono, para comparar sitios con el mismo criterio.
 
+**Mercado potencial en pesos (radio, isócronas, polígono y capa "Gasto").**
+Cuánto gastan al año los hogares del área, en total y por categoría —
+alimentos para el hogar, alimentos fuera (restaurantes), vestido y calzado,
+vivienda, limpieza, salud, transporte, educación y esparcimiento, cuidado
+personal — en pesos de 2024. La capa "Gasto" pinta el gasto mensual por
+hogar de cada AGEB.
+
+`scripts/build_gasto.py` genera `data/ags_gasto_ageb.json`:
+
+1. **Modelo lineal por categoría** con los ~1,800 hogares urbanos de
+   Aguascalientes de la ENIGH 2024 (microdatos, ponderados por factor de
+   expansión). Variables: años de escolaridad del jefe, internet,
+   computadora, automóvil, servicios completos, ocupantes por cuarto e
+   integrantes del hogar — las mismas que el Censo 2020 publica por AGEB
+   (como % o promedio). Por ser lineal, aplicarlo a los promedios de un AGEB
+   da exactamente el promedio del modelo sobre sus hogares: no hay sesgo de
+   agregación.
+2. **Calibración**: el Censo decide *dónde* está el gasto y la ENIGH
+   *cuánto*. Cada categoría se escala para que el promedio por hogar de las
+   AGEBs iguale el de la ENIGH en los hogares urbanos de Aguascalientes y
+   Jesús María (factores entre 0.97 y 1.06: ambas fuentes cuadran).
+3. En la app, `mercadoPotencial()` (`web/buffer-core.js`) suma viviendas ×
+   fracción de área × hogares por vivienda (1.01, ENIGH) × gasto × 4
+   trimestres. Las 7 AGEBs sin estimación (datos confidenciales) se reportan
+   como falta de cobertura, no se imputan.
+
+**Qué tan confiable es.** R² del gasto total: 0.26 por hogar (validación
+cruzada) y 0.39 por UPM, los conglomerados de viviendas vecinas de la ENIGH
+(lo más parecido a un AGEB que se puede validar). Un AGEB promedia cientos
+de hogares, así que el error por área es menor que el de una UPM de 5-6
+hogares, pero no se puede medir directamente. Salud tiene R² por UPM < 0.1
+(el gasto en salud es muy irregular): la app la marca "orientativo".
+**Limitación conocida:** el modelo lineal comprime los extremos — las
+variables del Censo se saturan en zonas altas (casi todos tienen auto e
+internet), así que en AGEBs A/B el gasto probablemente se **subestima** y en
+las más bajas se sobreestima. Sirve para dimensionar mercados y comparar
+zonas, no como venta esperada.
+
+Regenerar: descargar a `data/raw/enigh/` los ZIP `concentradohogar`,
+`hogares` y `viviendas` (CSV) de los
+[microdatos ENIGH 2024](https://www.inegi.org.mx/programas/enigh/nc/2024/#microdatos),
+descomprimir cada uno en su carpeta y correr
+`.venv/bin/python scripts/build_gasto.py` (imprime R² y calibración por
+categoría). Con la ENIGH 2026 basta cambiar las rutas.
+
 **Mis puntos (datos del cliente).** Botón "Mis puntos" en la barra de capas:
 carga un CSV, Excel (.xlsx) o GeoJSON con sucursales, clientes o sitios
 candidatos. Requiere columnas de coordenadas (`lat`/`lon`, `latitud`/
@@ -226,6 +274,7 @@ descarga de cdnjs solo al abrir un .xlsx.
 | Recámaras / cuartos | Censo 2020 (mismo ITER de arriba): `VPH_2YMASD`, `VPH_3YMASC` | mismo CSV |
 | Marginación urbana | CONAPO, Índice de Marginación Urbana 2020 | `data/raw/conapo/IMU_2020.xls` |
 | Proyección de población | CONAPO, Proyecciones de Población de los Municipios de México 1990-2040 | `data/raw/conapo/pobproy_ggrupos.csv` |
+| Gasto de los hogares | INEGI, ENIGH 2024 — microdatos `concentradohogar`, `hogares`, `viviendas` ([descarga](https://www.inegi.org.mx/programas/enigh/nc/2024/#microdatos)) | `data/raw/enigh/` → `scripts/build_gasto.py` |
 | Puntos de interés | OpenStreetMap contributors, vía [Overpass API](https://overpass-api.de/api/interpreter) (dato abierto ODbL) | generado por `scripts/build_poi.py`, no se guarda insumo crudo |
 
 URLs de descarga directa usadas:

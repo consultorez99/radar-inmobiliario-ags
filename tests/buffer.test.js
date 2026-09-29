@@ -444,3 +444,45 @@ test("mercado: sobre el radio real de Lisboa coincide con aggregateDemographics"
   const sumSeg = m.segmentos.pob.alto + m.segmentos.pob.medio + m.segmentos.pob.bajo;
   assert.ok(Math.abs(sumSeg - conNivel) < 1e-6);
 });
+
+// ------------------------------------------- mercado potencial en pesos
+test("mercado potencial: viviendas × fracción × hogares/vivienda × gasto trimestral × 4", () => {
+  const rows = [
+    { frac: 1.0, props: { TVIVPARHAB: 100, gasto: { total: 60000, salud: 2000 } } },
+    { frac: 0.5, props: { TVIVPARHAB: 200, gasto: { total: 30000, salud: 1000 } } },
+  ];
+  const m = BufferCore.mercadoPotencial(rows, 1.01);
+  // (100×60,000 + 100×30,000) × 1.01 × 4
+  assert.ok(Math.abs(m.anual.total - 9000000 * 1.01 * 4) < 1e-6);
+  assert.ok(Math.abs(m.anual.salud - 300000 * 1.01 * 4) < 1e-6);
+  assert.ok(Math.abs(m.hogares - 202) < 1e-9);
+  assert.ok(Math.abs(m.gastoAnualPorHogar - 45000 * 4) < 1e-6);
+  assert.equal(m.coberturaPct, 100);
+});
+
+test("mercado potencial: AGEB sin estimación no aporta pesos y baja la cobertura", () => {
+  const rows = [
+    { frac: 1.0, props: { TVIVPARHAB: 300, gasto: { total: 50000 } } },
+    { frac: 1.0, props: { TVIVPARHAB: 100 } }, // confidencial en el Censo: sin gasto
+  ];
+  const m = BufferCore.mercadoPotencial(rows);
+  assert.equal(m.anual.total, 300 * 50000 * 4);
+  assert.equal(m.coberturaPct, 75);
+  const vacio = BufferCore.mercadoPotencial([]);
+  assert.equal(vacio.gastoAnualPorHogar, null);
+  assert.equal(vacio.coberturaPct, null);
+});
+
+test("mercado potencial: el archivo generado cubre casi todas las AGEBs y el total ≈ suma de categorías", () => {
+  const g = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "ags_gasto_ageb.json"), "utf8"));
+  const agebs = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "ags_agebs.json"), "utf8"));
+  const cubiertas = agebs.features.filter((f) => g.agebs[f.properties.CVEGEO]).length;
+  assert.ok(cubiertas / agebs.features.length > 0.95, `${cubiertas} de ${agebs.features.length}`);
+  // cada categoría es un modelo aparte: la suma no tiene que cuadrar exacto
+  // con el total, pero sí andar cerca (la ENIGH tiene rubros menores fuera de
+  // estas categorías, p. ej. transferencias)
+  for (const v of Object.values(g.agebs).slice(0, 50)) {
+    const suma = Object.entries(v).filter(([k]) => k !== "total").reduce((s, [, x]) => s + x, 0);
+    assert.ok(suma > v.total * 0.75 && suma < v.total * 1.1, `${suma} vs ${v.total}`);
+  }
+});

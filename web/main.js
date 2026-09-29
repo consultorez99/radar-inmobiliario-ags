@@ -73,6 +73,17 @@ const DENS_BINS = [
   { min: 0, color: "#fcc5c0", label: "< 5,000 hab/km²" },
 ];
 
+// Gasto mensual estimado por hogar (ENIGH 2024 + Censo 2020, ver
+// scripts/build_gasto.py). Verde-azulados: no se confunde con NSE (verde a
+// rojo) ni con densidad (magentas). Cortes cerca de los cuartiles.
+const GASTO_BINS = [
+  { min: 25000, color: "#014636", label: "≥ $25,000 al mes" },
+  { min: 22000, color: "#02818a", label: "$22,000 – $25,000" },
+  { min: 19000, color: "#3690c0", label: "$19,000 – $22,000" },
+  { min: 16000, color: "#a6bddb", label: "$16,000 – $19,000" },
+  { min: 0, color: "#ece2f0", label: "< $16,000" },
+];
+
 // Viviendas deshabitadas: % por AGEB (rojos — señal de alerta/sobreoferta)
 const DESH_BINS = [
   { min: 20, color: "#99000d", label: "≥ 20%" },
@@ -141,6 +152,7 @@ let supLayer = null;
 let pduLayer = null;
 let densLayer = null;
 let deshLayer = null;
+let gastoLayer = null;
 let margLayer = null;
 let activeLayerName = "nse";
 
@@ -305,6 +317,24 @@ function densPopup(p) {
     <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Población entre área del polígono AGEB (Censo 2020, INEGI).</div>`;
 }
 
+function gastoPopup(p) {
+  const g = p.gasto;
+  const modelos = DATA.gasto?.meta?.modelos || {};
+  const filas = g
+    ? Object.entries(g).filter(([k]) => k !== "total").sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([k, v]) => `<tr><td>${modelos[k]?.etiqueta || k}</td><td>${fmtMXN(Math.round(v / 3))}</td></tr>`).join("")
+    : "";
+  return `
+    <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
+    <table class="popup-table">
+      <tr><td>Gasto mensual por hogar</td><td><strong>${g ? fmtMXN(Math.round(g.total / 3)) : "s/d"}</strong></td></tr>
+      ${filas}
+      <tr><td>Hogares (viviendas habitadas)</td><td>${p.TVIVPARHAB != null ? p.TVIVPARHAB.toLocaleString("es-MX") : "s/d"}</td></tr>
+    </table>
+    <div style="margin-top:5px;font-size:10.5px;color:var(--muted)">Estimación propia: modelo con la ENIGH 2024
+      aplicado a las características de vivienda del Censo 2020. Pesos de 2024. No es un dato medido.</div>`;
+}
+
 function deshPopup(p) {
   return `
     <div class="popup-title">AGEB ${p.CVE_AGEB} · ${p.municipio}</div>
@@ -397,6 +427,24 @@ async function loadData() {
     if (shfResp.ok) DATA.shfIndice = await shfResp.json();
   } catch (err) { console.warn("No se pudo cargar el índice SHF:", err); }
 
+  // Gasto estimado de los hogares por AGEB (scripts/build_gasto.py). Se
+  // fusiona en las propiedades de cada AGEB para que los análisis lo sumen
+  // con la misma interpolación areal que la población. No crítico.
+  try {
+    const gastoResp = await fetch("../data/ags_gasto_ageb.json");
+    if (gastoResp.ok) {
+      const g = await gastoResp.json();
+      DATA.gasto = { meta: g.meta };
+      for (const f of agebs.features) {
+        const v = g.agebs[f.properties.CVEGEO];
+        if (v) {
+          f.properties.gasto = v;
+          f.properties.gasto_mensual = v.total / 3;
+        }
+      }
+    }
+  } catch (err) { console.warn("No se pudo cargar el gasto estimado:", err); }
+
   nseLayer = L.geoJSON(agebs, {
     style: nseStyle,
     onEachFeature: (f, layer) => {
@@ -444,6 +492,16 @@ async function loadData() {
       layer.on("click",     layerClick);
       layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#49006a" }); });
       layer.on("mouseout",  () => densLayer.resetStyle(layer));
+    },
+  });
+
+  gastoLayer = L.geoJSON(agebs, {
+    style: pctStyle(GASTO_BINS, "gasto_mensual"),
+    onEachFeature: (f, layer) => {
+      layer.bindPopup(() => gastoPopup(f.properties), { maxWidth: 300 });
+      layer.on("click",     layerClick);
+      layer.on("mouseover", () => { if (!window.bufferPicking) layer.setStyle({ weight: 2.2, color: "#014636" }); });
+      layer.on("mouseout",  () => gastoLayer.resetStyle(layer));
     },
   });
 
@@ -552,6 +610,7 @@ function buildLegends() {
     .join("");
   document.getElementById("legend-dens-rows").innerHTML = DENS_BINS.map(binRow).join("");
   document.getElementById("legend-desh-rows").innerHTML = DESH_BINS.map(binRow).join("");
+  document.getElementById("legend-gasto-rows").innerHTML = GASTO_BINS.map(binRow).join("");
   document.getElementById("legend-marg-rows").innerHTML = Object.entries(MARG_LABELS)
     .map(([g, label]) => binRow({ color: MARG_COLORS[g], label }))
     .join("");
@@ -567,6 +626,7 @@ const LAYERS = {
   dens: () => densLayer,
   desh: () => deshLayer,
   marg: () => margLayer,
+  gasto: () => gastoLayer,
 };
 
 let pduLayerPending = false; // click en PDU mientras descarga: activarla al llegar

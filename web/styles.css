@@ -1311,3 +1311,6 @@ body.iso-picking #map * {
   .modal { padding: 16px; max-height: 90vh; }
   .modal-wide { max-width: none; }
 }
+
+/* tabla de mercado potencial: las categorías son largas, pueden partirse */
+.gasto-tabla td:first-child { white-space: normal; min-width: 96px; }
